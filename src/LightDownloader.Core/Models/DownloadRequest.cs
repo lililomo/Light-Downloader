@@ -13,4 +13,7 @@ public sealed class DownloadRequest
 
     /// <summary>"http" (default) or "video" (grab with yt-dlp).</summary>
     public string? Kind { get; set; }
+
+    /// <summary>Target folder; when empty the remembered folder for the file's category is used.</summary>
+    public string? SaveFolder { get; set; }
 }

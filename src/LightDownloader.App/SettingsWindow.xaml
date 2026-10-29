@@ -1,30 +1,65 @@
 <Window x:Class="LightDownloader.App.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Settings" Width="480" SizeToContent="Height"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False">
-    <StackPanel Margin="16">
-        <TextBlock Text="Download folder" />
-        <DockPanel Margin="0,4,0,12">
-            <Button DockPanel.Dock="Right" Content="Browse…" Width="84" Margin="8,0,0,0" Click="OnBrowse" />
-            <TextBox x:Name="FolderBox" Height="26" VerticalContentAlignment="Center" />
+        xmlns:local="clr-namespace:LightDownloader.App"
+        Title="Settings" Width="600" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Style="{StaticResource WindowStyle}">
+    <StackPanel Margin="26,20,26,22">
+        <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" />
+
+        <TextBlock Text="DOWNLOADS" Style="{StaticResource SectionHeader}" />
+        <TextBlock Text="Default download folder" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
+        <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Margin="8,0,0,0"
+                    local:IconProps.Glyph="&#xE838;" ToolTip="Choose a folder" Click="OnBrowse" />
+            <TextBox x:Name="FolderBox" />
+        </DockPanel>
+        <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Connections per download" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ConnBox" ToolTip="1 – 32" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Downloads at once" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ConcBox" ToolTip="1 – 20" />
+            </StackPanel>
+            <StackPanel Grid.Column="4">
+                <TextBlock Text="Speed limit (KB/s, 0 = off)" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="SpeedBox" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Text="BEHAVIOR" Style="{StaticResource SectionHeader}" />
+        <CheckBox x:Name="AskBox" Content="Ask where to save each download" />
+        <CheckBox x:Name="ProgressBox" Content="Open the progress window when a download starts" Margin="0,10,0,0" />
+        <CheckBox x:Name="MinimizedBox" Content="Start minimized to the tray" Margin="0,10,0,0" />
+
+        <TextBlock Text="BROWSER INTEGRATION" Style="{StaticResource SectionHeader}" />
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Bridge port" VerticalAlignment="Center" Foreground="{StaticResource SubTextBrush}" />
+            <TextBox x:Name="PortBox" Width="96" Margin="12,0,0,0" />
+            <TextBlock Text="Restart the app after changing it." VerticalAlignment="Center" Margin="12,0,0,0"
+                       FontSize="12" Foreground="{StaticResource MutedBrush}" />
+        </StackPanel>
+
+        <TextBlock Text="REMEMBERED FOLDERS" Style="{StaticResource SectionHeader}" />
+        <DockPanel>
+            <Button x:Name="ForgetButton" DockPanel.Dock="Right" Content="Forget all" VerticalAlignment="Top" Click="OnForget" />
+            <TextBlock x:Name="RememberedText" Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap"
+                       VerticalAlignment="Center" Margin="0,0,12,0" />
         </DockPanel>
 
-        <TextBlock Text="Connections per download (1–32)" />
-        <TextBox x:Name="ConnBox" Height="26" Margin="0,4,0,12" VerticalContentAlignment="Center" />
-
-        <TextBlock Text="Max concurrent downloads (1–20)" />
-        <TextBox x:Name="ConcBox" Height="26" Margin="0,4,0,12" VerticalContentAlignment="Center" />
-
-        <TextBlock Text="Speed limit in KB/s (0 = unlimited)" />
-        <TextBox x:Name="SpeedBox" Height="26" Margin="0,4,0,12" VerticalContentAlignment="Center" />
-
-        <TextBlock Text="Browser bridge port" />
-        <TextBox x:Name="PortBox" Height="26" Margin="0,4,0,12" VerticalContentAlignment="Center" />
-
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-            <Button Content="Save" Width="96" Click="OnSave" IsDefault="True" />
-            <Button Content="Cancel" Width="84" Margin="8,0,0,0" Click="OnCancel" IsCancel="True" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,26,0,0">
+            <Button Content="Cancel" IsCancel="True" MinWidth="92" />
+            <Button Content="Save" Style="{StaticResource PrimaryButton}" IsDefault="True" MinWidth="110"
+                    Margin="10,0,0,0" Click="OnSave" />
         </StackPanel>
     </StackPanel>
 </Window>

@@ -19,8 +19,24 @@ public sealed class AppSettings
 
     public bool StartMinimized { get; set; } = false;
 
+    /// <summary>Show the "New download" dialog (pick the folder) before a captured download starts.</summary>
+    public bool AskWhereToSave { get; set; } = true;
+
+    /// <summary>Open the per-download progress window when a download is started.</summary>
+    public bool ShowProgressWindow { get; set; } = true;
+
+    /// <summary>Folders remembered per category, e.g. "Video" → "D:\Videos".</summary>
+    public Dictionary<string, string> CategoryFolders { get; set; } = new();
+
     // Simple daily scheduler.
     public bool SchedulerEnabled { get; set; } = false;
     public string? StartTime { get; set; } // "HH:mm" — start all downloads
     public string? StopTime { get; set; }  // "HH:mm" — pause all downloads
+
+    public AppSettings Clone()
+    {
+        var c = (AppSettings)MemberwiseClone();
+        c.CategoryFolders = new Dictionary<string, string>(CategoryFolders);
+        return c;
+    }
 }

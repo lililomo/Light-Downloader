@@ -7,8 +7,9 @@ obj/
 .vs/
 .idea/
 
-# App runtime data (if ever placed in-tree)
-tools/
+# App runtime data (if ever placed in-tree). Anchored to the repo root so it doesn't
+# swallow the source folder src/LightDownloader.Core/Tools/.
+/tools/
 *.ldm
 
 # Installer build artifacts

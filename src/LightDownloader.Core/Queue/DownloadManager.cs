@@ -7,6 +7,7 @@ using LightDownloader.Core.Engine;
 using LightDownloader.Core.Http;
 using LightDownloader.Core.Models;
 using LightDownloader.Core.Tools;
+using LightDownloader.Core.Util;
 using LightDownloader.Core.Video;
 
 namespace LightDownloader.Core.Queue;
@@ -24,6 +25,7 @@ public sealed class DownloadManager : IDisposable
 
     private readonly List<DownloadItem> _items = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _running = new();
+    private readonly ConcurrentDictionary<Guid, RateLimiter> _itemLimiters = new();
     private readonly Dictionary<Guid, long> _lastBytes = new();
     private readonly System.Threading.Timer _speedTimer;
     private DateTime _lastSpeedTick = DateTime.UtcNow;
@@ -101,6 +103,8 @@ public sealed class DownloadManager : IDisposable
         };
         if (string.IsNullOrWhiteSpace(item.FileName))
             item.FileName = GuessNameFromUrl(req.Url);
+        item.SaveFolder = string.IsNullOrWhiteSpace(req.SaveFolder) ? FolderFor(item.Category) : req.SaveFolder!;
+        if (!autoStart) item.Status = DownloadStatus.Paused; // "download later"
 
         lock (_gate)
         {
@@ -122,12 +126,13 @@ public sealed class DownloadManager : IDisposable
             Kind = DownloadKind.Video,
             Url = req.Url,
             FileName = "(fetching video…)",
-            SaveFolder = Settings.DownloadFolder,
+            SaveFolder = string.IsNullOrWhiteSpace(req.SaveFolder) ? FolderFor(Categories.Video) : req.SaveFolder!,
             Referrer = req.Referrer,
             UserAgent = req.UserAgent,
             Cookies = req.Cookies,
             TotalSize = -1
         };
+        if (!autoStart) item.Status = DownloadStatus.Paused;
         lock (_gate) _items.Add(item);
         ItemAdded?.Invoke(item);
         SaveState();
@@ -181,14 +186,21 @@ public sealed class DownloadManager : IDisposable
         _running[id] = cts;
         item.Status = DownloadStatus.Connecting;
         item.Error = null;
+        item.LastTryAt = DateTime.Now;
+        var limiter = _itemLimiters.GetOrAdd(id, _ => new RateLimiter(0));
+        limiter.SetLimit(item.SpeedLimitBytesPerSec);
         ItemChanged?.Invoke(item);
 
         _ = Task.Run(async () =>
         {
             try
             {
-                item.Status = DownloadStatus.Downloading;
-                ItemChanged?.Invoke(item);
+                if (item.Kind != DownloadKind.Http)
+                {
+                    // yt-dlp/ffmpeg report progress themselves; HTTP leaves "Connecting…" once the server answers.
+                    item.Status = DownloadStatus.Downloading;
+                    ItemChanged?.Invoke(item);
+                }
                 switch (item.Kind)
                 {
                     case DownloadKind.Video:
@@ -198,7 +210,7 @@ public sealed class DownloadManager : IDisposable
                         await _converter.RunAsync(item, cts.Token).ConfigureAwait(false);
                         break;
                     default:
-                        await _engine.RunAsync(item, cts.Token).ConfigureAwait(false);
+                        await _engine.RunAsync(item, cts.Token, limiter).ConfigureAwait(false);
                         break;
                 }
                 item.Status = DownloadStatus.Completed;
@@ -261,12 +273,100 @@ public sealed class DownloadManager : IDisposable
             if (item != null) _items.Remove(item);
         }
         if (item == null) return;
+        _itemLimiters.TryRemove(id, out _);
 
-        if (deleteFile) TryDelete(item.FullPath);
+        if (deleteFile) TryDeleteSoon(item.FullPath);
         TryDelete(item.ControlPath);
 
         ItemRemoved?.Invoke(item);
         SaveState();
+    }
+
+    public bool IsRunning(Guid id) => _running.ContainsKey(id);
+
+    /// <summary>The remembered folder for a category, or the default download folder.</summary>
+    public string FolderFor(string category)
+        => Settings.CategoryFolders.TryGetValue(category, out var f) && !string.IsNullOrWhiteSpace(f)
+            ? f
+            : Settings.DownloadFolder;
+
+    public void RememberFolder(string category, string folder)
+    {
+        Settings.CategoryFolders[category] = folder;
+        SaveSettings();
+    }
+
+    /// <summary>Looks up size, file name and resume support before a download is added.</summary>
+    public async Task<ProbeResult?> ProbeAsync(DownloadRequest req, CancellationToken ct = default)
+    {
+        var probeItem = new DownloadItem
+        {
+            Url = req.Url,
+            Referrer = req.Referrer,
+            UserAgent = req.UserAgent,
+            Cookies = req.Cookies,
+            Headers = req.Headers ?? new()
+        };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(15));
+        try { return await HttpProbe.ProbeAsync(_http, probeItem, cts.Token).ConfigureAwait(false); }
+        catch { return null; }
+    }
+
+    public void SetItemSpeedLimit(Guid id, long bytesPerSec)
+    {
+        var item = Find(id);
+        if (item == null) return;
+        item.SpeedLimitBytesPerSec = Math.Max(0, bytesPerSec);
+        if (_itemLimiters.TryGetValue(id, out var limiter)) limiter.SetLimit(item.SpeedLimitBytesPerSec);
+        SaveState();
+        ItemChanged?.Invoke(item);
+    }
+
+    /// <summary>Moves/renames a download that is not running; its partial or finished file moves with it.</summary>
+    public void Relocate(Guid id, string newFolder, string newFileName)
+    {
+        var item = Find(id) ?? throw new InvalidOperationException("Download not found.");
+        if (_running.ContainsKey(id)) throw new InvalidOperationException("Pause the download before moving it.");
+
+        newFileName = HttpProbe.Sanitize(newFileName);
+        var oldPath = item.FullPath;
+        var newPath = Path.Combine(newFolder, newFileName);
+        if (string.Equals(Path.GetFullPath(oldPath), Path.GetFullPath(newPath), StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Directory.CreateDirectory(newFolder);
+        if (File.Exists(newPath)) throw new IOException($"\"{newFileName}\" already exists in that folder.");
+        if (File.Exists(oldPath)) File.Move(oldPath, newPath);
+        if (File.Exists(oldPath + ".ldm")) File.Move(oldPath + ".ldm", newPath + ".ldm", true);
+
+        item.SaveFolder = newFolder;
+        item.FileName = newFileName;
+        SaveState();
+        ItemChanged?.Invoke(item);
+    }
+
+    /// <summary>Removes finished downloads from the list (files stay on disk).</summary>
+    public int RemoveCompleted()
+    {
+        List<DownloadItem> done;
+        lock (_gate)
+        {
+            done = _items.Where(i => i.Status == DownloadStatus.Completed).ToList();
+            foreach (var i in done) _items.Remove(i);
+        }
+        foreach (var i in done)
+        {
+            _itemLimiters.TryRemove(i.Id, out _);
+            ItemRemoved?.Invoke(i);
+        }
+        if (done.Count > 0) SaveState();
+        return done.Count;
+    }
+
+    private DownloadItem? Find(Guid id)
+    {
+        lock (_gate) return _items.FirstOrDefault(i => i.Id == id);
     }
 
     public void UpdateSettings(AppSettings s)
@@ -433,6 +533,19 @@ public sealed class DownloadManager : IDisposable
     private static void TryDelete(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
+    }
+
+    /// <summary>Deletes a file, retrying briefly while a just-cancelled download releases its handle.</summary>
+    private static void TryDeleteSoon(string path)
+    {
+        _ = Task.Run(async () =>
+        {
+            for (int i = 0; i < 20 && File.Exists(path); i++)
+            {
+                try { File.Delete(path); return; }
+                catch { await Task.Delay(250).ConfigureAwait(false); }
+            }
+        });
     }
 
     public void Dispose()

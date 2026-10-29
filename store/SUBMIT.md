@@ -20,10 +20,12 @@ Listing text, permission justifications and the privacy policy are in this folde
    - Set the data-use disclosures (collects cookies etc., not sold/shared).
    - Add the **privacy policy URL** (host `PRIVACY.md`).
    - State the single purpose.
-5. Add assets (you provide these):
-   - At least one **screenshot** 1280×800 or 640×400.
-   - Store icon 128×128 (already in the package).
-   - Optional promo tile 440×280.
+5. Add the ready-made assets:
+   - **Store icon:** `store/icons/chrome-store-icon-128.png` (128×128 with the recommended padding).
+   - **Screenshots (1280×800):** `store/screenshots/store-1280x800-1-main.png`,
+     `-2-progress.png`, `-3-save.png`.
+   - **Small promo tile (440×280):** `store/icons/promo-small-440x280.png`.
+   - **Marquee (1400×560, optional):** `store/icons/promo-marquee-1400x560.png`.
 6. Submit for review. Broad host access + cookies means it may get a longer review;
    the justifications in `PERMISSIONS.md` cover it.
 
@@ -33,6 +35,7 @@ Listing text, permission justifications and the privacy policy are in this folde
 2. **Submit a New Add-on** → *On this site* → upload `dist/light-downloader-firefox.zip`.
 3. Choose self-distribution or listed (listed = public on AMO).
 4. Fill the listing from `STORE-LISTING.md`; add the privacy policy URL.
+   Icon: `store/icons/icon-128.png` (or `icon-64.png`); screenshots: `store/screenshots/store-1280x800-*.png`.
 5. Paste `PERMISSIONS.md` into **Notes to reviewer**.
 6. Submit. AMO runs automated validation first (see `web-ext lint`), then human review.
 

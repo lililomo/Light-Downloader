@@ -23,6 +23,12 @@ public sealed class BridgeServer : IDisposable
 
     public event Action<DownloadItem>? DownloadCaptured;
 
+    /// <summary>
+    /// Raised instead of adding the download when "ask where to save" is on; the desktop app
+    /// shows its New-download dialog and adds the item once the user confirms.
+    /// </summary>
+    public event Action<DownloadRequest>? DownloadRequested;
+
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
     public BridgeServer(DownloadManager mgr) => _mgr = mgr;
@@ -90,6 +96,12 @@ public sealed class BridgeServer : IDisposable
                         if (dr == null || string.IsNullOrWhiteSpace(dr.Url))
                         {
                             await WriteJsonAsync(stream, 400, origin, new { ok = false, error = "missing url" }).ConfigureAwait(false);
+                            break;
+                        }
+                        if (_mgr.Settings.AskWhereToSave && DownloadRequested != null)
+                        {
+                            DownloadRequested.Invoke(dr);
+                            await WriteJsonAsync(stream, 200, origin, new { ok = true, pending = true }).ConfigureAwait(false);
                             break;
                         }
                         var item = _mgr.Add(dr, autoStart: true);

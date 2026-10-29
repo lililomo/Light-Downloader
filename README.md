@@ -5,10 +5,19 @@ Native .NET (WPF) desktop app + a loopback bridge the browser extensions talk to
 
 ## Features
 
+- **IDM-style interface** — dark, native-feeling window with a categories sidebar (live counts),
+  colored file-type icons, status-colored progress, search, and a live speed card. Adapts to narrow
+  and portrait screens.
+- **Per-download progress window** — segment map (one block per connection), connection table,
+  transfer rate, time left, resume capability, Open / Open folder when finished.
+- **Ask where to save** — every new download (typed or captured from the browser) opens a dialog
+  with the size, category (auto-detected) and folder; the folder can be remembered per category.
+- **Change location** — move or rename any download, partial or finished.
 - **Multi-connection downloads** — splits each file into parallel byte-range connections (default 8) for speed.
-- **Resume** — survives pause and app restart via a per-file `.ldm` control file.
+- **Resume** — survives pause and app restart (progress is saved with the download list).
+- **Robust connections** — server timeouts and stalled connections are detected and reconnected automatically.
 - **Queue** — limits how many downloads run at once; the rest wait.
-- **Speed limiter** — global cap (token bucket), 0 = unlimited.
+- **Speed limiter** — global cap, plus an optional per-download cap in the progress window.
 - **Browser capture** — Chrome (MV3) + Firefox extensions intercept downloads, cancel the browser's own download, and hand the URL + cookies + referrer/User-Agent to the app.
 - **Video grabber** — "Add video" / right-click "Download video from this page" grabs video with **yt-dlp** and merges video+audio with **ffmpeg**.
 - **Media converter** — convert/remux a finished file (MP4 / MKV / MP3 / M4A / WAV) with ffmpeg.
@@ -38,6 +47,9 @@ Uninstall via *Add/Remove Programs*, or run:
 ```
 
 Rebuild the installer after code changes with `build-installer.ps1`.
+
+The app icon is vector art in `art/IconGen`; `build-icons.ps1` regenerates the `.ico`, the
+extension icons and every store asset in `store/icons`.
 
 ## Build & run
 

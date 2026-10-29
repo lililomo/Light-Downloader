@@ -10,6 +10,7 @@ public partial class SchedulerWindow : Window
     public SchedulerWindow(AppSettings s)
     {
         InitializeComponent();
+        WindowTheme.Apply(this);
         Result = s;
         EnabledBox.IsChecked = s.SchedulerEnabled;
         StartBox.Text = s.StartTime ?? "";
@@ -18,28 +19,33 @@ public partial class SchedulerWindow : Window
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
-        Result = Clone(Result);
-        Result.SchedulerEnabled = EnabledBox.IsChecked == true;
-        Result.StartTime = Normalize(StartBox.Text);
-        Result.StopTime = Normalize(StopBox.Text);
+        if (!TryParse(StartBox.Text, out var start) || !TryParse(StopBox.Text, out var stop))
+        {
+            ErrorText.Text = "Times must look like 01:00 or 23:30.";
+            ErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+        var s = Result.Clone();
+        s.SchedulerEnabled = EnabledBox.IsChecked == true;
+        s.StartTime = start;
+        s.StopTime = stop;
+        Result = s;
         DialogResult = true;
     }
 
     private void OnCancel(object sender, RoutedEventArgs e) => DialogResult = false;
 
-    private static string? Normalize(string? s)
-        => TimeSpan.TryParse(s?.Trim(), out var t) ? t.ToString(@"hh\:mm") : null;
-
-    private static AppSettings Clone(AppSettings s) => new()
+    /// <summary>Empty input is valid (action skipped); otherwise it must be a time of day.</summary>
+    private static bool TryParse(string? text, out string? value)
     {
-        DownloadFolder = s.DownloadFolder,
-        DefaultConnections = s.DefaultConnections,
-        MaxConcurrentDownloads = s.MaxConcurrentDownloads,
-        SpeedLimitBytesPerSec = s.SpeedLimitBytesPerSec,
-        ServerPort = s.ServerPort,
-        StartMinimized = s.StartMinimized,
-        SchedulerEnabled = s.SchedulerEnabled,
-        StartTime = s.StartTime,
-        StopTime = s.StopTime
-    };
+        value = null;
+        text = text?.Trim();
+        if (string.IsNullOrEmpty(text)) return true;
+        if (TimeSpan.TryParse(text, out var t) && t >= TimeSpan.Zero && t < TimeSpan.FromDays(1))
+        {
+            value = t.ToString(@"hh\:mm");
+            return true;
+        }
+        return false;
+    }
 }

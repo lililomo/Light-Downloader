@@ -17,6 +17,10 @@ public sealed class DownloadItem : INotifyPropertyChanged
     public DownloadKind Kind { get; set; } = DownloadKind.Http;
     public DateTime AddedAt { get; set; } = DateTime.Now;
     public DateTime? CompletedAt { get; set; }
+    public DateTime? LastTryAt { get; set; }
+
+    /// <summary>Per-download speed cap in bytes/second (on top of the global limit); 0 = none.</summary>
+    public long SpeedLimitBytesPerSec { get; set; }
 
     public string? Referrer { get; set; }
     public string? UserAgent { get; set; }
@@ -60,7 +64,8 @@ public sealed class DownloadItem : INotifyPropertyChanged
 
     [JsonIgnore]
     public double Progress =>
-        PercentOverride is double pct ? Math.Clamp(pct / 100.0, 0, 1)
+        _status == DownloadStatus.Completed ? 1 // video/convert items keep no byte counts after a restart
+        : PercentOverride is double pct ? Math.Clamp(pct / 100.0, 0, 1)
         : TotalSize > 0 ? Math.Clamp((double)Downloaded / TotalSize, 0, 1)
         : 0;
 
@@ -72,7 +77,7 @@ public sealed class DownloadItem : INotifyPropertyChanged
             ? (TotalSize > 0 ? Formatting.Bytes(TotalSize) : "—")
             : TotalSize > 0
                 ? $"{Formatting.Bytes(Downloaded)} / {Formatting.Bytes(TotalSize)}"
-                : Formatting.Bytes(Downloaded);
+                : Downloaded > 0 ? Formatting.Bytes(Downloaded) : "—";
 
     [JsonIgnore]
     public string SpeedText => _status == DownloadStatus.Downloading ? Formatting.Speed(SpeedBytesPerSec) : "—";
@@ -96,13 +101,54 @@ public sealed class DownloadItem : INotifyPropertyChanged
         _ => _status.ToString()
     };
 
+    [JsonIgnore]
+    public string Category => Kind == DownloadKind.Video ? Categories.Video : Categories.FromFileName(FileName);
+
+    [JsonIgnore]
+    public bool IsActive => _status is DownloadStatus.Downloading or DownloadStatus.Connecting;
+
+    [JsonIgnore]
+    public string Host
+    {
+        get
+        {
+            if (Kind == DownloadKind.Convert) return "Local file";
+            return Uri.TryCreate(Url, UriKind.Absolute, out var u) ? u.Host : "";
+        }
+    }
+
+    [JsonIgnore] public string SubLine => $"{Host} · {AddedAt:dd MMM yyyy, HH:mm}";
+
+    /// <summary>Short status shown under the progress bar in the list.</summary>
+    [JsonIgnore]
+    public string StatusLine
+    {
+        get
+        {
+            bool known = TotalSize > 0 || PercentOverride.HasValue;
+            return _status switch
+            {
+                DownloadStatus.Downloading when Kind == DownloadKind.Video && PercentOverride is null => "Fetching video info…",
+                DownloadStatus.Downloading when Kind == DownloadKind.Convert => $"Converting · {ProgressPercent:0.#}%",
+                DownloadStatus.Downloading => known ? $"Downloading · {ProgressPercent:0.#}%" : $"Downloading · {Formatting.Bytes(Downloaded)}",
+                DownloadStatus.Connecting => "Connecting…",
+                DownloadStatus.Paused => known ? $"Paused · {ProgressPercent:0.#}%" : "Paused",
+                DownloadStatus.Queued => "Queued",
+                DownloadStatus.Completed => "Completed",
+                DownloadStatus.Error => "Error: " + Error,
+                _ => _status.ToString()
+            };
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private static readonly string[] NotifyProps =
     {
-        nameof(Status), nameof(StatusText), nameof(Downloaded), nameof(Progress),
+        nameof(Status), nameof(StatusText), nameof(StatusLine), nameof(Downloaded), nameof(Progress),
         nameof(ProgressPercent), nameof(SizeText), nameof(SpeedText), nameof(EtaText),
-        nameof(TotalSize), nameof(FileName)
+        nameof(TotalSize), nameof(FileName), nameof(Category), nameof(IsActive), nameof(Host),
+        nameof(SubLine), nameof(SaveFolder), nameof(SpeedLimitBytesPerSec)
     };
 
     /// <summary>Raise change notifications for all display properties. Call on the UI thread.</summary>

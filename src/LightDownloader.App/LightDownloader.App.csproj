@@ -11,17 +11,25 @@
     <AssemblyName>LightDownloader</AssemblyName>
     <RootNamespace>LightDownloader.App</RootNamespace>
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    <Version>1.1.0</Version>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\logo-128.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LightDownloader.Core\LightDownloader.Core.csproj" />
   </ItemGroup>
 
-  <!-- WinForms is only used (via the WF. alias) for the tray NotifyIcon; drop its
-       implicit global using so System.Windows.Forms types (Application, MessageBox,
-       Clipboard) don't clash with their WPF namesakes. -->
+  <!-- WinForms is only used (via the WF./Drawing. aliases) for the tray NotifyIcon; drop its
+       implicit global usings so System.Windows.Forms / System.Drawing types (Application,
+       MessageBox, Clipboard, Brush, Color) don't clash with their WPF namesakes. -->
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
 </Project>

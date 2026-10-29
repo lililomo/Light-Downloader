@@ -13,6 +13,8 @@ public sealed class DownloadEngine
     private readonly RateLimiter _rate;
     private const int BufferSize = 64 * 1024;
     private const int MaxRetriesPerSegment = 5;
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
 
     public DownloadEngine(HttpClient http, RateLimiter rate)
     {
@@ -21,12 +23,13 @@ public sealed class DownloadEngine
     }
 
     /// <summary>Runs to completion, or throws <see cref="OperationCanceledException"/> on pause/cancel.</summary>
-    public async Task RunAsync(DownloadItem item, CancellationToken ct)
+    /// <param name="itemLimiter">Optional per-download throttle applied on top of the global one.</param>
+    public async Task RunAsync(DownloadItem item, CancellationToken ct, RateLimiter? itemLimiter = null)
     {
         // Fresh item: probe the server, then lay out the segments.
         if (item.Segments.Count == 0)
         {
-            var probe = await HttpProbe.ProbeAsync(_http, item, ct).ConfigureAwait(false);
+            var probe = await ProbeWithRetryAsync(item, ct).ConfigureAwait(false);
             item.FinalUrl = probe.FinalUrl;
             item.SupportsRanges = probe.SupportsRanges;
             item.TotalSize = probe.TotalSize;
@@ -42,6 +45,7 @@ public sealed class DownloadEngine
 
         Directory.CreateDirectory(item.SaveFolder);
         PreallocateFile(item);
+        item.Status = DownloadStatus.Downloading; // the server answered: leave "Connecting…"
 
         var url = item.FinalUrl ?? item.Url;
 
@@ -50,20 +54,44 @@ public sealed class DownloadEngine
             var tasks = new List<Task>();
             foreach (var seg in item.Segments)
                 if (!seg.IsComplete)
-                    tasks.Add(DownloadSegmentAsync(url, item, seg, ct));
+                    tasks.Add(DownloadSegmentAsync(url, item, seg, itemLimiter, ct));
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
         else
         {
             var seg = item.Segments[0];
-            await DownloadSegmentAsync(url, item, seg, ct).ConfigureAwait(false);
+            await DownloadSegmentAsync(url, item, seg, itemLimiter, ct).ConfigureAwait(false);
             if (item.TotalSize <= 0) item.TotalSize = seg.Downloaded;
+        }
+    }
+
+    /// <summary>Probes with a timeout, retrying transient failures, so a silent server can't hang the download.</summary>
+    private async Task<ProbeResult> ProbeWithRetryAsync(DownloadItem item, CancellationToken ct)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(ProbeTimeout);
+            try
+            {
+                return await HttpProbe.ProbeAsync(_http, item, timeout.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested && attempt < 3
+                                       && ex is OperationCanceledException or HttpRequestException or IOException)
+            {
+                await Task.Delay(1000 * attempt, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new TimeoutException("The server didn't respond.");
+            }
         }
     }
 
     private static void BuildSegments(DownloadItem item)
     {
-        item.Segments.Clear();
+        // Build a fresh list and swap it in, so UI readers never see a half-built list.
+        var segments = new List<SegmentState>();
         if (item.SupportsRanges && item.TotalSize > 0 && item.Connections > 1)
         {
             // Don't create tiny segments for small files.
@@ -74,14 +102,15 @@ public sealed class DownloadEngine
             for (int i = 0; i < n; i++)
             {
                 long end = (i == n - 1) ? item.TotalSize - 1 : start + chunk - 1;
-                item.Segments.Add(new SegmentState(start, end));
+                segments.Add(new SegmentState(start, end));
                 start = end + 1;
             }
         }
         else
         {
-            item.Segments.Add(new SegmentState(0, item.TotalSize > 0 ? item.TotalSize - 1 : -1));
+            segments.Add(new SegmentState(0, item.TotalSize > 0 ? item.TotalSize - 1 : -1));
         }
+        item.Segments = segments;
     }
 
     private static void PreallocateFile(DownloadItem item)
@@ -91,28 +120,37 @@ public sealed class DownloadEngine
             fs.SetLength(item.TotalSize);
     }
 
-    private async Task DownloadSegmentAsync(string url, DownloadItem item, SegmentState seg, CancellationToken ct)
+    private async Task DownloadSegmentAsync(string url, DownloadItem item, SegmentState seg,
+        RateLimiter? itemLimiter, CancellationToken ct)
     {
         int attempt = 0;
         while (true)
         {
             try
             {
-                await DownloadSegmentOnceAsync(url, item, seg, ct).ConfigureAwait(false);
+                await DownloadSegmentOnceAsync(url, item, seg, itemLimiter, ct).ConfigureAwait(false);
                 return;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; } // paused/cancelled
             catch (Exception) when (attempt++ < MaxRetriesPerSegment)
             {
+                // Transient error or a stalled connection: reconnect from where this segment stopped.
                 await Task.Delay(1000 * attempt, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new IOException("The connection kept stalling.");
             }
         }
     }
 
-    private async Task DownloadSegmentOnceAsync(string url, DownloadItem item, SegmentState seg, CancellationToken ct)
+    private async Task DownloadSegmentOnceAsync(string url, DownloadItem item, SegmentState seg,
+        RateLimiter? itemLimiter, CancellationToken ct)
     {
         bool ranged = item.SupportsRanges && seg.End >= 0;
         using var file = new FileStream(item.FullPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
+        // Cancelled when the connection goes silent for StallTimeout; the caller then reconnects.
+        using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
         while (seg.End < 0 || seg.Downloaded < seg.Length)
         {
@@ -122,7 +160,8 @@ public sealed class DownloadEngine
             HttpProbe.ApplyHeaders(req, item);
             if (ranged) req.Headers.Range = new RangeHeaderValue(from, seg.End);
 
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct)
+            stall.CancelAfter(StallTimeout);
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, stall.Token)
                                         .ConfigureAwait(false);
 
             if (ranged && resp.StatusCode != HttpStatusCode.PartialContent)
@@ -139,14 +178,18 @@ public sealed class DownloadEngine
             }
 
             file.Position = from;
-            using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var stream = await resp.Content.ReadAsStreamAsync(stall.Token).ConfigureAwait(false);
 
             var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
             try
             {
-                int read;
-                while ((read = await stream.ReadAsync(buffer.AsMemory(0, BufferSize), ct).ConfigureAwait(false)) > 0)
+                while (true)
                 {
+                    stall.CancelAfter(StallTimeout);
+                    int read = await stream.ReadAsync(buffer.AsMemory(0, BufferSize), stall.Token).ConfigureAwait(false);
+                    stall.CancelAfter(Timeout.InfiniteTimeSpan); // throttling below must not count as a stall
+                    if (read <= 0) break;
+
                     if (ranged && seg.End >= 0)
                     {
                         long remaining = seg.Length - seg.Downloaded;
@@ -154,6 +197,7 @@ public sealed class DownloadEngine
                         if (read == 0) break;
                     }
                     await _rate.ThrottleAsync(read, ct).ConfigureAwait(false);
+                    if (itemLimiter != null) await itemLimiter.ThrottleAsync(read, ct).ConfigureAwait(false);
                     await file.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                     Interlocked.Add(ref seg.Downloaded, read);
                     if (ranged && seg.Downloaded >= seg.Length) break;

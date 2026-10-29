@@ -4,7 +4,7 @@ using System.Reflection;
 using Microsoft.Win32;
 
 const string AppName = "Light Downloader";
-const string Version = "1.0.0";
+const string Version = "1.1.0";
 const string RegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\LightDownloader";
 
 var argv = Environment.GetCommandLineArgs().Skip(1).ToArray();

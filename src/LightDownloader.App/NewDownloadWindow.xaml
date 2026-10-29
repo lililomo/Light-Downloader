@@ -1,0 +1,66 @@
+<Window x:Class="LightDownloader.App.NewDownloadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:LightDownloader.App"
+        Title="New download" Width="620" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Style="{StaticResource WindowStyle}"
+        Icon="pack://application:,,,/Assets/app.ico">
+    <StackPanel Margin="26,22,26,22">
+        <!-- Header -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border x:Name="TypeBadge" Width="48" Height="48" CornerRadius="12">
+                <TextBlock x:Name="TypeGlyph" FontFamily="{StaticResource IconFont}" FontSize="22"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Name="HeaderTitle" Text="New download" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock x:Name="HeaderInfo" Text="Getting file info…" Foreground="{StaticResource SubTextBrush}"
+                           Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Text="Address" Style="{StaticResource FieldLabel}" Margin="0,22,0,6" />
+        <TextBox x:Name="UrlBox" TextChanged="OnUrlChanged" />
+
+        <TextBlock Text="File name" Style="{StaticResource FieldLabel}" />
+        <TextBox x:Name="NameBox" TextChanged="OnNameChanged" />
+
+        <Grid Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Category" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
+                <ComboBox x:Name="CategoryBox" SelectionChanged="OnCategoryChanged" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Save to" Style="{StaticResource FieldLabel}" Margin="0,0,0,6" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Margin="8,0,0,0"
+                            local:IconProps.Glyph="&#xE838;" ToolTip="Choose a folder" Click="OnBrowse" />
+                    <TextBox x:Name="FolderBox" TextChanged="OnFolderChanged" />
+                </DockPanel>
+            </StackPanel>
+        </Grid>
+
+        <CheckBox x:Name="RememberBox" Margin="0,16,0,0" Content="Remember this folder for Other files" />
+        <TextBlock x:Name="WarnText" Foreground="{StaticResource WarningBrush}" Margin="0,12,0,0"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+
+        <!-- Footer -->
+        <DockPanel Margin="0,24,0,0">
+            <Button x:Name="LaterButton" Content="Download later" Click="OnLater" ToolTip="Add to the list without starting" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" IsCancel="True" MinWidth="92" Click="OnCancel" />
+                <Button x:Name="StartButton" Content="Start download" Style="{StaticResource PrimaryButton}"
+                        IsDefault="True" MinWidth="132" Margin="10,0,0,0" Click="OnStart" />
+            </StackPanel>
+        </DockPanel>
+    </StackPanel>
+</Window>
