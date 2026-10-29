@@ -2,9 +2,8 @@
 
 _Last updated: 2026-10-29_
 
-Both stores require a privacy policy URL for extensions that access data such as
-cookies. Host this text at a public URL (e.g. a GitHub Pages page or a gist) and
-paste that URL into the listing's privacy-policy field.
+Hosted at **https://beliaja.id/light-downloader/privacy/**. Paste that URL into the
+listing's privacy-policy field; keep this file and the hosted page in sync.
 
 ## What the extension accesses
 For a download you choose to capture (by starting it, or via the right-click
@@ -31,4 +30,5 @@ extension. When the desktop app is not running, nothing is captured and download
 proceed normally in the browser.
 
 ## Contact
-(Add your contact email or repository issues URL here.)
+Questions about this policy: order@beliaja.id, or see
+https://beliaja.id/light-downloader/extension/.

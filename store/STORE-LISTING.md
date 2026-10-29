@@ -35,7 +35,10 @@ The extension talks ONLY to the Light Downloader app on your own computer
 (http://127.0.0.1). It does not send anything to any remote server. If the
 desktop app is not running, the browser downloads normally.
 
-Requires the free Light Downloader desktop app.
+Requires the free Light Downloader desktop app: https://beliaja.id/light-downloader/
 
-## Support / homepage
-(Fill in your repo or site URL, e.g. a GitHub repository.)
+## URLs for the store forms
+- Homepage / support: https://beliaja.id/light-downloader/extension/
+- Privacy policy: https://beliaja.id/light-downloader/privacy/
+- Desktop app (sales + download page): https://beliaja.id/light-downloader/
+- Support email: order@beliaja.id

@@ -18,7 +18,7 @@ Listing text, permission justifications and the privacy policy are in this folde
 4. **Privacy practices** tab:
    - Paste each permission justification from `PERMISSIONS.md`.
    - Set the data-use disclosures (collects cookies etc., not sold/shared).
-   - Add the **privacy policy URL** (host `PRIVACY.md`).
+   - Add the **privacy policy URL**: https://beliaja.id/light-downloader/privacy/
    - State the single purpose.
 5. Add the ready-made assets:
    - **Store icon:** `store/icons/chrome-store-icon-128.png` (128×128 with the recommended padding).
@@ -34,7 +34,9 @@ Listing text, permission justifications and the privacy policy are in this folde
 1. One-time: create an account at https://addons.mozilla.org/developers/ (free).
 2. **Submit a New Add-on** → *On this site* → upload `dist/light-downloader-firefox.zip`.
 3. Choose self-distribution or listed (listed = public on AMO).
-4. Fill the listing from `STORE-LISTING.md`; add the privacy policy URL.
+4. Fill the listing from `STORE-LISTING.md`; privacy policy URL
+   https://beliaja.id/light-downloader/privacy/, homepage
+   https://beliaja.id/light-downloader/extension/.
    Icon: `store/icons/icon-128.png` (or `icon-64.png`); screenshots: `store/screenshots/store-1280x800-*.png`.
 5. Paste `PERMISSIONS.md` into **Notes to reviewer**.
 6. Submit. AMO runs automated validation first (see `web-ext lint`), then human review.
@@ -45,3 +47,5 @@ Listing text, permission justifications and the privacy policy are in this folde
 - Bump `version` in **both** manifests for every update.
 - The extensions are useless without the desktop app running; mention that in the
   listing so reviewers/users aren't confused when "nothing happens".
+- Once a listing is live, put its store URL in `public/light-downloader/assets/toko.js`
+  on beliaja.id (green-1); the sales and support pages show "segera hadir" until then.

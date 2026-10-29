@@ -3,6 +3,8 @@
 A lightweight, IDM-style download manager for Windows with Chrome/Firefox integration.
 Native .NET (WPF) desktop app + a loopback bridge the browser extensions talk to.
 
+Download: https://beliaja.id/light-downloader/
+
 ## Features
 
 - **IDM-style interface** — dark, native-feeling window with a categories sidebar (live counts),
