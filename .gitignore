@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+*.user
+
+# Visual Studio / Rider
+.vs/
+.idea/
+
+# App runtime data (if ever placed in-tree)
+tools/
+*.ldm
+
+# Installer build artifacts
+publish/
+installer/
+**/payload.zip
+
+# Extension store packages + web-ext artifacts
+dist/
+web-ext-artifacts/

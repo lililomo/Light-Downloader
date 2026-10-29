@@ -1,0 +1,55 @@
+<Window x:Class="LightDownloader.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Light Downloader" Height="500" Width="920"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <ToolBar DockPanel.Dock="Top">
+            <Button Content="Add URL" Click="OnAdd" />
+            <Button Content="Add video" Click="OnAddVideo" />
+            <Separator />
+            <Button Content="Resume" Click="OnResume" />
+            <Button Content="Pause" Click="OnPause" />
+            <Button Content="Remove" Click="OnRemove" />
+            <Button Content="Convert" Click="OnConvert" />
+            <Separator />
+            <Button Content="Open folder" Click="OnOpenFolder" />
+            <Button Content="Scheduler" Click="OnScheduler" />
+            <Button Content="Settings" Click="OnSettings" />
+        </ToolBar>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="BridgeStatus" Text="Bridge: —" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="TotalSpeed" Text="Total: —" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <DataGrid x:Name="Grid" AutoGenerateColumns="False" IsReadOnly="True"
+                  CanUserAddRows="False" SelectionMode="Extended"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="*" />
+                <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="150" />
+                <DataGridTemplateColumn Header="Progress" Width="170">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="16" />
+                                <TextBlock Text="{Binding ProgressPercent, StringFormat={}{0:0.#}%}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="130" />
+                <DataGridTextColumn Header="Speed" Binding="{Binding SpeedText}" Width="100" />
+                <DataGridTextColumn Header="ETA" Binding="{Binding EtaText}" Width="80" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

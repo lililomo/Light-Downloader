@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>LightDownloader</AssemblyName>
+    <RootNamespace>LightDownloader.App</RootNamespace>
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LightDownloader.Core\LightDownloader.Core.csproj" />
+  </ItemGroup>
+
+  <!-- WinForms is only used (via the WF. alias) for the tray NotifyIcon; drop its
+       implicit global using so System.Windows.Forms types (Application, MessageBox,
+       Clipboard) don't clash with their WPF namesakes. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>
