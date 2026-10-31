@@ -15,7 +15,6 @@ obj/
 # Installer build artifacts
 publish/
 installer/
-**/payload.zip
 
 # Extension store packages + web-ext artifacts
 dist/

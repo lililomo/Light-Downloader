@@ -41,6 +41,12 @@ internal static class Program
         Save(RenderPromo(440, 280), P("store", "icons", "promo-small-440x280.png"));
         Save(RenderPromo(1400, 560), P("store", "icons", "promo-marquee-1400x560.png"));
 
+        // Installer wizard artwork, one per display scale (100/125/150/200%).
+        foreach (var (w, h) in new[] { (202, 386), (253, 483), (303, 579), (404, 772) })
+            SaveBmp(RenderWizardSide(w, h), P("setup", $"wizard-side-{w}.bmp"));
+        foreach (var s in new[] { 58, 73, 87, 116 })
+            SaveBmp(RenderWizardCorner(s), P("setup", $"wizard-corner-{s}.bmp"));
+
         Console.WriteLine("Icon assets written under " + root);
         return 0;
     }
@@ -173,6 +179,58 @@ internal static class Program
         return Render(v, w, h);
     }
 
+    /// <summary>Tall panel on the installer's Welcome and Finished pages.</summary>
+    private static BitmapSource RenderWizardSide(int w, int h)
+    {
+        var v = new DrawingVisual();
+        using (var dc = v.RenderOpen())
+        {
+            var bg = new LinearGradientBrush(
+                new GradientStopCollection { new(Rgb("#0B1020"), 0), new(Rgb("#1A2160"), 0.55), new(Rgb("#0B4A5E"), 1) },
+                new Point(0, 0), new Point(0.35, 1));
+            dc.DrawRectangle(bg, null, new Rect(0, 0, w, h));
+
+            double u = w / 202.0; // layout unit
+            var glow = new RadialGradientBrush(Color.FromArgb(100, 59, 130, 246), Color.FromArgb(0, 59, 130, 246));
+            dc.DrawEllipse(glow, null, new Point(w / 2.0, 138 * u), 120 * u, 120 * u);
+            var glow2 = new RadialGradientBrush(Color.FromArgb(70, 6, 196, 226), Color.FromArgb(0, 6, 196, 226));
+            dc.DrawEllipse(glow2, null, new Point(w, h), 150 * u, 150 * u);
+
+            int iconPx = (int)(92 * u);
+            dc.DrawImage(RenderIcon(iconPx), new Rect((w - iconPx) / 2.0, 92 * u, iconPx, iconPx));
+
+            DrawCentered(dc, "Light Downloader", w / 2.0, 200 * u, 19 * u, w - 20 * u, FontWeights.Bold, Brushes.White);
+            DrawCentered(dc, "Fast, multi-connection downloads", w / 2.0, 230 * u, 10.5 * u, w - 24 * u,
+                FontWeights.Normal, new SolidColorBrush(Rgb("#CBD5E1")));
+        }
+        return Render(v, w, h);
+    }
+
+    /// <summary>Corner mark on the installer's inner pages (the header there is white).</summary>
+    private static BitmapSource RenderWizardCorner(int size)
+    {
+        var v = new DrawingVisual();
+        using (var dc = v.RenderOpen())
+        {
+            dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, size, size));
+            dc.DrawImage(RenderIcon(size), new Rect(0, 0, size, size));
+        }
+        return Render(v, size, size);
+    }
+
+    private static void DrawCentered(DrawingContext dc, string text, double cx, double y, double px, double maxWidth,
+        FontWeight weight, Brush brush)
+    {
+        var tf = new Typeface(new FontFamily("Segoe UI Variable Display, Segoe UI"), FontStyles.Normal, weight, FontStretches.Normal);
+        FormattedText ft;
+        do
+        {
+            ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tf, px, brush, 1.0);
+            px *= 0.96;
+        } while (ft.Width > maxWidth && px > 6);
+        dc.DrawText(ft, new Point(cx - ft.Width / 2, y));
+    }
+
     /// <summary>Draws a single line, shrinking the font until it fits <paramref name="maxWidth"/>.</summary>
     private static void DrawText(DrawingContext dc, string text, double x, double y, double px, double maxWidth,
         FontWeight weight, Brush brush)
@@ -201,6 +259,16 @@ internal static class Program
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, Png(bmp));
+    }
+
+    /// <summary>Opaque 24-bit BMP, the format Inno Setup's wizard images use.</summary>
+    private static void SaveBmp(BitmapSource bmp, string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var enc = new BmpBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(new FormatConvertedBitmap(bmp, PixelFormats.Bgr24, null, 0)));
+        using var fs = File.Create(path);
+        enc.Save(fs);
     }
 
     private static byte[] Png(BitmapSource bmp)

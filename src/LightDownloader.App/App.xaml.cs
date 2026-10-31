@@ -17,6 +17,7 @@ public partial class App : Application
     private readonly Dictionary<Guid, ProgressWindow> _progress = new();
     private readonly HashSet<Guid> _announcedComplete = new();
     private static Mutex? _mutex;
+    private static EventWaitHandle? _exitSignal;
 
     public static new App Current => (App)Application.Current;
 
@@ -24,6 +25,11 @@ public partial class App : Application
     {
         _mutex = new Mutex(true, "LightDownloader_SingleInstance_8F2A", out bool isNew);
         if (!isNew) { Shutdown(); return; }
+
+        // The installer and uninstaller signal this to close a running copy cleanly (it lives in the tray).
+        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "LightDownloader_Exit_8F2A");
+        ThreadPool.RegisterWaitForSingleObject(_exitSignal,
+            (_, _) => Dispatcher.InvokeAsync(ExitApp), null, Timeout.Infinite, executeOnlyOnce: true);
 
         Manager = new DownloadManager();
         Server = new BridgeServer(Manager);

@@ -37,18 +37,17 @@ and retries while offline.
 
 ## Install
 
-Double-click **`installer/LightDownloaderSetup.exe`**. It installs to
-`%LocalAppData%\Programs\Light Downloader`, adds Start Menu + Desktop shortcuts,
-registers an entry in *Add/Remove Programs*, and launches the app (which then
-downloads ffmpeg + yt-dlp in the background). No administrator rights needed.
+Double-click **`installer/LightDownloaderSetup.exe`**, a standard Windows setup wizard
+(English and Indonesian). It installs to `%LocalAppData%\Programs\Light Downloader` by default,
+adds Start Menu and optional Desktop shortcuts, registers an entry in *Add/Remove Programs*, and
+can launch the app when it finishes (the app then downloads ffmpeg + yt-dlp in the background).
+No administrator rights are needed for the app itself. If the .NET 8 Desktop Runtime is missing,
+the wizard offers to download and install it from Microsoft, which asks for elevation.
 
-Uninstall via *Add/Remove Programs*, or run:
+Uninstall via *Add/Remove Programs*.
 
-```
-"%LocalAppData%\Programs\Light Downloader\LightDownloaderSetup.exe" --uninstall
-```
-
-Rebuild the installer after code changes with `build-installer.ps1`.
+Rebuild the installer after code changes with `build-installer.ps1` (needs
+[Inno Setup 6](https://jrsoftware.org/isdl.php)). The wizard script is `setup/LightDownloader.iss`.
 
 The app icon is vector art in `art/IconGen`; `build-icons.ps1` regenerates the `.ico`, the
 extension icons and every store asset in `store/icons`.
