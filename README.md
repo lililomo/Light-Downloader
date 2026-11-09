@@ -28,6 +28,11 @@ Download: https://beliaja.id/light-downloader/
 - **Media converter** — convert/remux a finished file (MP4 / MKV / MP3 / M4A / WAV) with ffmpeg.
 - **Simple scheduler** — optional daily "start all at HH:mm" / "pause all at HH:mm".
 - **System tray** — closing the window hides to tray; the app keeps running.
+- **Automatic updates** — at startup (and every 12 hours) the app reads `latest.json` from
+  software.beliaja.id. When a newer version is out it shows an update prompt (Update now / Remind me
+  later / Skip this version); *Update now* downloads the installer, checks its SHA-256, runs it
+  silently and starts the new version. *Help → Check for updates...* checks on demand; it can be
+  turned off in Options → General.
 
 ffmpeg + yt-dlp are **not bundled**. On first run the app downloads them in the
 background (into `%AppData%\LightDownloader\tools`) whenever the network is available,
@@ -53,6 +58,17 @@ Uninstall via *Add/Remove Programs*.
 
 Rebuild the installer after code changes with `build-installer.ps1` (needs
 [Inno Setup 6](https://jrsoftware.org/isdl.php)). The wizard script is `setup/LightDownloader.iss`.
+
+### Releasing an update
+
+1. Raise `<Version>` in `src/LightDownloader.App/LightDownloader.App.csproj` and write the
+   "What's new" text in `setup/release-notes.txt`.
+2. Run `build-installer.ps1`. It writes `installer/LightDownloaderSetup.exe` and
+   `installer/latest.json` (version, download URL, SHA-256, size, notes).
+3. Upload the installer to `https://software.beliaja.id/light-downloader/<version>/LightDownloaderSetup.exe`
+   **first**, then `latest.json` to `https://software.beliaja.id/light-downloader/latest.json`.
+   Installed copies offer the update from then on. The app only accepts an https download from
+   software.beliaja.id whose SHA-256 matches `latest.json`.
 
 The app icon is vector art in `art/IconGen`; `build-icons.ps1` regenerates the `.ico`, the
 extension icons and every store asset in `store/icons`.

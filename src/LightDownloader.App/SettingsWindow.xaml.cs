@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
 
         StartupBox.IsChecked = s.RunAtStartup;
         MinimizedBox.IsChecked = s.StartMinimized;
+        UpdatesBox.IsChecked = s.CheckForUpdates;
         CaptureBox.IsChecked = s.BrowserCapture;
         VideoButtonBox.IsChecked = s.VideoButton;
         foreach (var (key, name) in AppSettings.Browsers)
@@ -116,6 +117,7 @@ public partial class SettingsWindow : Window
         CommitFolder();
         _working.RunAtStartup = StartupBox.IsChecked == true;
         _working.StartMinimized = MinimizedBox.IsChecked == true;
+        _working.CheckForUpdates = UpdatesBox.IsChecked == true;
         _working.BrowserCapture = CaptureBox.IsChecked == true;
         _working.VideoButton = VideoButtonBox.IsChecked == true;
         _working.DisabledBrowsers = _browserBoxes.Where(kv => kv.Value.IsChecked != true).Select(kv => kv.Key).ToList();

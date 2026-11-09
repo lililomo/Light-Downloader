@@ -87,6 +87,8 @@ Type: dirifempty; Name: "{app}\extension"
 Type: dirifempty; Name: "{app}"
 
 [Run]
+; In-app update (silent setup started by the app with /UPDATE=1): start the new version again.
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: IsAppUpdate
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent; Check: RuntimeInstalled
 ; The stores only let the user add an extension themselves, so open each store page in its own browser.
 Filename: "{code:ChromeExe}"; Parameters: """{#ChromeStoreUrl}"""; Description: "{cm:InstallChromeExt}"; Flags: nowait postinstall skipifsilent; Check: ChromeNeedsExtension
@@ -115,6 +117,11 @@ function SetEvent(hEvent: THandle): BOOL;
   external 'SetEvent@kernel32.dll stdcall';
 function CloseHandle(hObject: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
+
+function IsAppUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
 
 function HasLegacyInstall: Boolean;
 begin

@@ -224,6 +224,7 @@ public partial class MainWindow : Window
     private void OnChromeExtension(object sender, RoutedEventArgs e) => Shell.OpenIn("chrome.exe", Shell.ChromeExtensionUrl);
     private void OnFirefoxExtension(object sender, RoutedEventArgs e) => Shell.OpenIn("firefox.exe", Shell.FirefoxAddonUrl);
     private void OnWebsite(object sender, RoutedEventArgs e) => Shell.Open(Shell.WebsiteUrl);
+    private async void OnCheckUpdates(object sender, RoutedEventArgs e) => await App.Current.CheckForUpdatesAsync(manual: true, owner: this);
 
     private void OnAbout(object sender, RoutedEventArgs e)
     {

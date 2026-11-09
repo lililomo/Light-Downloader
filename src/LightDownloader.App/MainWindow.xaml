@@ -45,6 +45,7 @@
                 <MenuItem Header="Get the _Chrome extension" Click="OnChromeExtension" />
                 <MenuItem Header="Get the _Firefox add-on" Click="OnFirefoxExtension" />
                 <Separator />
+                <MenuItem Header="Check for _updates..." Click="OnCheckUpdates" />
                 <MenuItem Header="Light Downloader _website" Click="OnWebsite" />
                 <MenuItem Header="_About Light Downloader" Click="OnAbout" />
             </MenuItem>

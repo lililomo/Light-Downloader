@@ -23,7 +23,8 @@ Listing text, permission justifications and the privacy policy are in this folde
 5. Add the ready-made assets:
    - **Store icon:** `store/icons/chrome-store-icon-128.png` (128×128 with the recommended padding).
    - **Screenshots (1280×800):** `store/screenshots/store-1280x800-1-main.png`,
-     `-2-progress.png`, `-3-save.png`.
+     `-2-progress.png`, `-3-save.png`, `-5-options.png`. Leave out `-4-video.png` here: it shows
+     downloading from YouTube, which the Chrome Web Store policies don't allow.
    - **Small promo tile (440×280):** `store/icons/promo-small-440x280.png`.
    - **Marquee (1400×560, optional):** `store/icons/promo-marquee-1400x560.png`.
 6. Submit for review. Broad host access + cookies means it may get a longer review;
@@ -37,7 +38,8 @@ Listing text, permission justifications and the privacy policy are in this folde
 4. Fill the listing from `STORE-LISTING.md`; privacy policy URL
    https://beliaja.id/light-downloader/privacy/, homepage
    https://beliaja.id/light-downloader/extension/.
-   Icon: `store/icons/icon-128.png` (or `icon-64.png`); screenshots: `store/screenshots/store-1280x800-*.png`.
+   Icon: `store/icons/icon-128.png` (or `icon-64.png`); screenshots: all five `store/screenshots/store-1280x800-*.png`
+   (the video one included).
 5. Paste `PERMISSIONS.md` into **Notes to reviewer**.
 6. Submit. AMO runs automated validation first (see `web-ext lint`), then human review.
 

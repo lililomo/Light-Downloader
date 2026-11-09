@@ -3,11 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Light Downloader Options" Width="520" Style="{StaticResource DialogWindow}" WindowStartupLocation="CenterOwner">
     <StackPanel Margin="10">
-        <TabControl Height="372">
+        <TabControl Height="394">
             <TabItem Header="General">
                 <StackPanel Margin="12">
                     <CheckBox x:Name="StartupBox" Content="Launch Light Downloader on startup" />
                     <CheckBox x:Name="MinimizedBox" Content="Start minimized to the notification area" Margin="0,7,0,0" />
+                    <CheckBox x:Name="UpdatesBox" Content="Check for updates automatically" Margin="0,7,0,0" />
                     <GroupBox Header="Browser integration" Margin="0,14,0,0" Padding="8,6">
                         <StackPanel>
                             <CheckBox x:Name="CaptureBox" Content="Capture downloads from browsers" Checked="OnCaptureToggled" Unchecked="OnCaptureToggled" />

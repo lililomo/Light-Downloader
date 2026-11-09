@@ -38,6 +38,12 @@ public sealed class AppSettings
     /// <summary>Start with Windows (minimized to the tray) so browser downloads are always captured.</summary>
     public bool RunAtStartup { get; set; } = true;
 
+    /// <summary>Look for a new version at startup (and twice a day while running).</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>A version the user chose to skip; its prompt isn't shown again.</summary>
+    public string? SkippedVersion { get; set; }
+
     /// <summary>Show the "New download" dialog (pick the folder) before a captured download starts.</summary>
     public bool AskWhereToSave { get; set; } = true;
 

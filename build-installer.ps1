@@ -32,4 +32,16 @@ Write-Host "3/3  Compiling the setup wizard..."
 & $iscc /Q "/DAppVersion=$version" @args "$root\setup\LightDownloader.iss"
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed." }
 
-Write-Host "Done: $root\installer\LightDownloaderSetup.exe ($version)"
+# latest.json tells installed copies about this release (see AppUpdater). Upload it to
+# https://software.beliaja.id/light-downloader/latest.json after the installer itself.
+$setup = Get-Item "$root\installer\LightDownloaderSetup.exe"
+$manifest = [ordered]@{
+    version = $version
+    url     = "https://software.beliaja.id/light-downloader/$version/LightDownloaderSetup.exe"
+    sha256  = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    size    = $setup.Length
+    notes   = (Get-Content "$root\setup\release-notes.txt" -Raw -Encoding UTF8).Trim()
+}
+[IO.File]::WriteAllText("$root\installer\latest.json", ($manifest | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+
+Write-Host "Done: $root\installer\LightDownloaderSetup.exe ($version) + latest.json"
