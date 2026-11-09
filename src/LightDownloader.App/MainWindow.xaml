@@ -2,275 +2,185 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LightDownloader.App"
-        Title="Light Downloader" Width="1240" Height="760" MinWidth="780" MinHeight="480"
-        WindowStartupLocation="CenterScreen" Style="{StaticResource WindowStyle}"
-        Icon="pack://application:,,,/Assets/app.ico" PreviewKeyDown="OnWindowKeyDown">
-    <Window.Resources>
-        <DataTemplate x:Key="NavTemplate">
-            <Grid>
-                <TextBlock Text="{Binding Label, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
-                           Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0"
-                           Visibility="{Binding IsHeader, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
-                <Grid Visibility="{Binding IsHeader, Mode=OneWay, Converter={StaticResource InvBoolToVis}}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="28" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding Glyph, Mode=OneWay}" Foreground="{Binding Brush, Mode=OneWay}"
-                               FontFamily="{StaticResource IconFont}" FontSize="15" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="{Binding Label, Mode=OneWay}" VerticalAlignment="Center" />
-                    <Border Grid.Column="2" Background="{StaticResource Surface3Brush}" CornerRadius="9" Padding="7,1" MinWidth="24">
-                        <TextBlock Text="{Binding Count, Mode=OneWay}" FontSize="11" Foreground="{StaticResource SubTextBrush}"
-                                   HorizontalAlignment="Center" />
-                    </Border>
-                </Grid>
-            </Grid>
-        </DataTemplate>
-    </Window.Resources>
+        Title="Light Downloader" Width="940" Height="560" MinWidth="640" MinHeight="380"
+        WindowStartupLocation="CenterScreen" Icon="pack://application:,,,/Assets/app.ico"
+        Background="{x:Static SystemColors.ControlBrush}" FontFamily="Segoe UI" FontSize="12"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True"
+        PreviewKeyDown="OnWindowKeyDown">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top" Background="White">
+            <MenuItem Header="_Tasks">
+                <MenuItem Header="_Add new download..." InputGestureText="Ctrl+N" Click="OnAddUrl" />
+                <MenuItem Header="Add _video download..." Click="OnAddVideo" />
+                <Separator />
+                <MenuItem Header="_Scheduler..." Click="OnScheduler" />
+                <MenuItem Header="_Convert file..." Click="OnConvert" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExit" />
+            </MenuItem>
+            <MenuItem Header="_File" SubmenuOpened="OnFileMenuOpened">
+                <MenuItem x:Name="MfOpen" Header="_Open" Click="OnOpenFile" />
+                <MenuItem x:Name="MfFolder" Header="Open _folder" Click="OnOpenFolder" />
+                <MenuItem x:Name="MfMove" Header="_Move/Rename..." Click="OnRelocate" />
+                <MenuItem x:Name="MfCopy" Header="_Copy address" Click="OnCopyUrl" />
+                <Separator />
+                <MenuItem x:Name="MfRemove" Header="_Remove from list" InputGestureText="Del" Click="OnRemoveFromList" />
+                <MenuItem x:Name="MfDelete" Header="_Delete file" InputGestureText="Shift+Del" Click="OnDeleteFile" />
+            </MenuItem>
+            <MenuItem Header="_Downloads">
+                <MenuItem Header="_Resume" Click="OnResume" />
+                <MenuItem Header="_Stop" Click="OnPause" />
+                <MenuItem Header="Start a_ll" Click="OnStartAll" />
+                <MenuItem Header="Stop _all" Click="OnPauseAll" />
+                <Separator />
+                <MenuItem Header="Delete _completed" Click="OnClearCompleted" />
+                <Separator />
+                <MenuItem Header="_Options..." Click="OnSettings" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem x:Name="MvCategories" Header="_Categories" IsCheckable="True" IsChecked="True" Click="OnToggleCategories" />
+                <MenuItem x:Name="MvToolbar" Header="_Toolbar" IsCheckable="True" IsChecked="True" Click="OnToggleToolbar" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Get the _Chrome extension" Click="OnChromeExtension" />
+                <MenuItem Header="Get the _Firefox add-on" Click="OnFirefoxExtension" />
+                <Separator />
+                <MenuItem Header="Light Downloader _website" Click="OnWebsite" />
+                <MenuItem Header="_About Light Downloader" Click="OnAbout" />
+            </MenuItem>
+        </Menu>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="216" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <!-- Brand -->
-        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,1">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0">
-                <Image Source="pack://application:,,,/Assets/logo-128.png" Width="32" Height="32"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="Light Downloader" FontSize="14.5" FontWeight="SemiBold" />
-                    <TextBlock x:Name="VersionText" Text="v1.0" FontSize="11" Foreground="{StaticResource MutedBrush}" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
-
-        <!-- Toolbar -->
-        <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,0,0,1" Padding="10,8">
-            <!-- WrapPanel: on narrow (e.g. portrait) screens the buttons wrap instead of being clipped. -->
+        <Border x:Name="ToolbarPanel" DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,1" Padding="4,2">
+            <!-- WrapPanel: on narrow screens the buttons wrap instead of being clipped. -->
             <WrapPanel>
-                <Button Style="{StaticResource ToolbarButton}" Content="Add URL" Click="OnAddUrl" ToolTip="Add a download by address (Ctrl+N)"
-                        local:IconProps.Glyph="&#xE710;" local:IconProps.GlyphBrush="{StaticResource Accent2Brush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Add video" Click="OnAddVideo" ToolTip="Grab a video from a page with yt-dlp"
-                        local:IconProps.Glyph="&#xE714;" local:IconProps.GlyphBrush="{StaticResource VioletBrush}" />
-                <Border Width="1" Margin="8,10" Background="{StaticResource BorderBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Resume" Click="OnResume" ToolTip="Resume the selected downloads"
-                        local:IconProps.Glyph="&#xE768;" local:IconProps.GlyphBrush="{StaticResource SuccessBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Pause" Click="OnPause" ToolTip="Pause the selected downloads"
-                        local:IconProps.Glyph="&#xE769;" local:IconProps.GlyphBrush="{StaticResource WarningBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Pause all" Click="OnPauseAll" ToolTip="Pause every running download"
-                        local:IconProps.Glyph="&#xE71A;" local:IconProps.GlyphBrush="{StaticResource DangerBrush}" />
-                <Border Width="1" Margin="8,10" Background="{StaticResource BorderBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Delete" Click="OnDelete" ToolTip="Remove the selected downloads (Del)"
-                        local:IconProps.Glyph="&#xE74D;" local:IconProps.GlyphBrush="{StaticResource DangerBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Clear done" Click="OnClearCompleted"
-                        ToolTip="Remove finished downloads from the list (files are kept)"
-                        local:IconProps.Glyph="&#xEA99;" local:IconProps.GlyphBrush="{StaticResource SubTextBrush}" />
-                <Border Width="1" Margin="8,10" Background="{StaticResource BorderBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Convert" Click="OnConvert" ToolTip="Convert a finished file with ffmpeg"
-                        local:IconProps.Glyph="&#xE8AB;" local:IconProps.GlyphBrush="{StaticResource VioletBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Scheduler" Click="OnScheduler" ToolTip="Start/pause downloads at set times"
-                        local:IconProps.Glyph="&#xE787;" local:IconProps.GlyphBrush="{StaticResource AccentBrush}" />
-                <Button Style="{StaticResource ToolbarButton}" Content="Settings" Click="OnSettings" ToolTip="Settings"
-                        local:IconProps.Glyph="&#xE713;" local:IconProps.GlyphBrush="{StaticResource SubTextBrush}" />
+                <Button Style="{StaticResource ToolButton}" Content="Add URL" Click="OnAddUrl" ToolTip="Add a download by address (Ctrl+N)"
+                        local:IconProps.Glyph="&#xE710;" local:IconProps.GlyphBrush="{StaticResource IconBlue}" />
+                <Button Style="{StaticResource ToolButton}" Content="Video" Click="OnAddVideo" ToolTip="Download a video from a web page"
+                        local:IconProps.Glyph="&#xE714;" local:IconProps.GlyphBrush="{StaticResource IconPurple}" />
+                <Border Style="{StaticResource ToolSeparator}" />
+                <Button Style="{StaticResource ToolButton}" Content="Resume" Click="OnResume" ToolTip="Resume the selected downloads"
+                        local:IconProps.Glyph="&#xE768;" local:IconProps.GlyphBrush="{StaticResource IconGreen}" />
+                <Button Style="{StaticResource ToolButton}" Content="Stop" Click="OnPause" ToolTip="Stop the selected downloads (they can be resumed)"
+                        local:IconProps.Glyph="&#xE769;" local:IconProps.GlyphBrush="{StaticResource IconOrange}" />
+                <Button Style="{StaticResource ToolButton}" Content="Stop All" Click="OnPauseAll" ToolTip="Stop every running download"
+                        local:IconProps.Glyph="&#xE71A;" local:IconProps.GlyphBrush="{StaticResource IconRed}" />
+                <Border Style="{StaticResource ToolSeparator}" />
+                <Button Style="{StaticResource ToolButton}" Content="Delete" Click="OnDelete" ToolTip="Delete the selected downloads (Del)"
+                        local:IconProps.Glyph="&#xE74D;" local:IconProps.GlyphBrush="{StaticResource IconRed}" />
+                <Button Style="{StaticResource ToolButton}" Content="Delete Completed" Click="OnClearCompleted"
+                        ToolTip="Remove finished downloads from the list (the files stay on disk)"
+                        local:IconProps.Glyph="&#xE73E;" local:IconProps.GlyphBrush="{StaticResource IconGray}" />
+                <Border Style="{StaticResource ToolSeparator}" />
+                <Button Style="{StaticResource ToolButton}" Content="Options" Click="OnSettings" ToolTip="Options"
+                        local:IconProps.Glyph="&#xE713;" local:IconProps.GlyphBrush="{StaticResource IconGray}" />
+                <Button Style="{StaticResource ToolButton}" Content="Scheduler" Click="OnScheduler" ToolTip="Start and stop downloads at set times"
+                        local:IconProps.Glyph="&#xE823;" local:IconProps.GlyphBrush="{StaticResource IconBlue}" />
+                <Button Style="{StaticResource ToolButton}" Content="Convert" Click="OnConvert" ToolTip="Convert a finished video or audio file"
+                        local:IconProps.Glyph="&#xE8AB;" local:IconProps.GlyphBrush="{StaticResource IconTeal}" />
             </WrapPanel>
         </Border>
 
-        <!-- Sidebar -->
-        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
-            <DockPanel>
-                <Border DockPanel.Dock="Bottom" Margin="12" Padding="14,12" CornerRadius="10" Background="{StaticResource Surface2Brush}">
-                    <StackPanel>
-                        <TextBlock Text="CURRENT SPEED" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="16"
-                                       Foreground="{StaticResource Accent2Brush}" VerticalAlignment="Center" />
-                            <TextBlock x:Name="SpeedBig" Text="0 B/s" FontSize="20" FontWeight="SemiBold" Margin="8,0,0,0" />
-                        </StackPanel>
-                        <TextBlock x:Name="SpeedSub" Text="No active downloads" FontSize="11.5"
-                                   Foreground="{StaticResource SubTextBrush}" Margin="0,4,0,0" />
-                    </StackPanel>
-                </Border>
-                <ListBox x:Name="NavList" Style="{StaticResource NavList}" ItemContainerStyle="{StaticResource NavItem}"
-                         ItemTemplate="{StaticResource NavTemplate}" Margin="0,10,0,0" SelectionChanged="OnNavChanged" />
-            </DockPanel>
-        </Border>
-
-        <!-- List -->
-        <Grid Grid.Row="1" Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <DockPanel Margin="22,14,16,10">
-                <Grid DockPanel.Dock="Right" Width="270" VerticalAlignment="Center">
-                    <TextBox x:Name="SearchBox" Padding="32,6,8,6" TextChanged="OnSearchChanged" />
-                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="13" Foreground="{StaticResource MutedBrush}"
-                               Margin="12,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
-                    <TextBlock Text="Search downloads  (Ctrl+F)" Foreground="{StaticResource MutedBrush}" Margin="33,0,0,0"
-                               VerticalAlignment="Center" IsHitTestVisible="False">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="ViewTitle" Text="All downloads" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock x:Name="ViewCount" Text="0 items" Foreground="{StaticResource MutedBrush}"
-                               Margin="10,5,0,0" VerticalAlignment="Center" />
-                </StackPanel>
-            </DockPanel>
-
-            <DataGrid x:Name="DownloadsGrid" Grid.Row="1" Margin="10,0,10,0" RowHeight="52"
-                      MouseDoubleClick="OnRowDoubleClick" PreviewMouseRightButtonDown="OnGridRightDown"
-                      PreviewKeyDown="OnGridKeyDown" SizeChanged="OnGridSizeChanged">
-                <DataGrid.ContextMenu>
-                    <ContextMenu Opened="OnRowMenuOpened">
-                        <MenuItem x:Name="MiOpen" Header="Open" Click="OnOpenFile"
-                                  local:IconProps.Glyph="&#xE8E5;" />
-                        <MenuItem x:Name="MiFolder" Header="Open folder" Click="OnOpenFolder"
-                                  local:IconProps.Glyph="&#xE838;" />
-                        <MenuItem x:Name="MiProgress" Header="Show progress" Click="OnShowProgress" InputGestureText="Enter"
-                                  local:IconProps.Glyph="&#xE946;" />
-                        <Separator />
-                        <MenuItem x:Name="MiResume" Header="Resume" Click="OnResume"
-                                  local:IconProps.Glyph="&#xE768;" local:IconProps.GlyphBrush="{StaticResource SuccessBrush}" />
-                        <MenuItem x:Name="MiPause" Header="Pause" Click="OnPause"
-                                  local:IconProps.Glyph="&#xE769;" local:IconProps.GlyphBrush="{StaticResource WarningBrush}" />
-                        <MenuItem x:Name="MiMove" Header="Change location…" Click="OnRelocate"
-                                  local:IconProps.Glyph="&#xE8DE;" />
-                        <MenuItem x:Name="MiCopy" Header="Copy address" Click="OnCopyUrl"
-                                  local:IconProps.Glyph="&#xE8C8;" />
-                        <MenuItem x:Name="MiConvert" Header="Convert…" Click="OnConvert"
-                                  local:IconProps.Glyph="&#xE8AB;" local:IconProps.GlyphBrush="{StaticResource VioletBrush}" />
-                        <Separator />
-                        <MenuItem Header="Remove from list" Click="OnRemoveFromList" InputGestureText="Del"
-                                  local:IconProps.Glyph="&#xE711;" />
-                        <MenuItem Header="Delete file" Click="OnDeleteFile" InputGestureText="Shift+Del"
-                                  local:IconProps.Glyph="&#xE74D;" local:IconProps.GlyphBrush="{StaticResource DangerBrush}" />
-                    </ContextMenu>
-                </DataGrid.ContextMenu>
-
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Name" Width="*" MinWidth="220" SortMemberPath="FileName">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="34" Height="34" CornerRadius="8"
-                                            Background="{Binding Category, Mode=OneWay, Converter={StaticResource CategoryTint}}">
-                                        <TextBlock Text="{Binding Category, Mode=OneWay, Converter={StaticResource CategoryGlyph}}"
-                                                   Foreground="{Binding Category, Mode=OneWay, Converter={StaticResource CategoryBrush}}"
-                                                   FontFamily="{StaticResource IconFont}" FontSize="16"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding FileName, Mode=OneWay}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding SubLine, Mode=OneWay}" FontSize="11.5" Margin="0,2,0,0"
-                                                   Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="Size" Width="150" SortMemberPath="TotalSize">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding SizeText, Mode=OneWay}" Foreground="{StaticResource SubTextBrush}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="Progress" Width="185" SortMemberPath="Progress">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel VerticalAlignment="Center">
-                                    <ProgressBar Style="{StaticResource RowProgress}" Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" />
-                                    <TextBlock Text="{Binding StatusLine, Mode=OneWay}" FontSize="11.5" Margin="0,5,0,0"
-                                               Foreground="{StaticResource SubTextBrush}" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="Speed" Width="90" SortMemberPath="SpeedBytesPerSec">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding SpeedText, Mode=OneWay}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn x:Name="EtaColumn" Header="Time left" Width="85">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding EtaText, Mode=OneWay}" Foreground="{StaticResource SubTextBrush}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn x:Name="AddedColumn" Header="Added" Width="115" SortMemberPath="AddedAt">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding AddedAt, Mode=OneWay, StringFormat={}{0:dd MMM, HH:mm}}"
-                                           Foreground="{StaticResource SubTextBrush}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <!-- Empty state -->
-            <StackPanel x:Name="EmptyState" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center"
-                        Visibility="Collapsed" IsHitTestVisible="False">
-                <Border Width="76" Height="76" CornerRadius="20" Background="{StaticResource Surface2Brush}" HorizontalAlignment="Center">
-                    <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="32"
-                               Foreground="{StaticResource Accent2Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock x:Name="EmptyTitle" Text="No downloads yet" FontSize="16" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" Margin="0,16,0,0" />
-                <TextBlock x:Name="EmptyHint" Text="Click Add URL, or start a download in Chrome or Firefox."
-                           Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center" Margin="0,6,0,0" />
-            </StackPanel>
-        </Grid>
-
-        <!-- Status bar -->
-        <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="16,7">
-            <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                    <TextBlock x:Name="LimitText" Text="Speed limit: off" FontSize="12" Foreground="{StaticResource SubTextBrush}" />
-                    <Border Width="1" Margin="12,2" Background="{StaticResource BorderBrush}" />
-                    <TextBlock x:Name="ActiveText" Text="0 active" FontSize="12" Foreground="{StaticResource SubTextBrush}" />
-                </StackPanel>
+        <StatusBar DockPanel.Dock="Bottom" Background="{x:Static SystemColors.ControlBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0">
+            <StatusBarItem><TextBlock x:Name="CountText" /></StatusBarItem>
+            <Separator />
+            <StatusBarItem><TextBlock x:Name="SpeedText" /></StatusBarItem>
+            <Separator />
+            <StatusBarItem><TextBlock x:Name="LimitText" /></StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="BridgeDot" Width="8" Height="8" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="BridgeText" Text="Browser bridge" Margin="8,0,0,0" FontSize="12" Foreground="{StaticResource SubTextBrush}" />
-                    <Border Width="1" Margin="12,2" Background="{StaticResource BorderBrush}" />
-                    <TextBlock x:Name="ToolsText" Text="Video tools" FontSize="12" Foreground="{StaticResource SubTextBrush}" />
+                    <TextBlock x:Name="ToolsText" Margin="0,0,14,0" />
+                    <TextBlock x:Name="BridgeText" />
                 </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="TreeColumn" Width="190" MinWidth="120" />
+                <ColumnDefinition x:Name="SplitColumn" Width="4" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel x:Name="CategoriesPanel" Background="White">
+                <Border DockPanel.Dock="Top" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="6,3,3,3"
+                        Background="{StaticResource ToolbarBrush}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="9"
+                                Width="18" Height="18" Padding="0" Background="Transparent" BorderThickness="0"
+                                ToolTip="Hide categories" Click="OnToggleCategories" />
+                        <TextBlock Text="Categories" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+                <TreeView x:Name="CategoryTree" BorderThickness="0" Padding="2,4" SelectedItemChanged="OnCategoryChanged" />
             </DockPanel>
-        </Border>
-    </Grid>
+
+            <GridSplitter x:Name="Splitter" Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{x:Static SystemColors.ControlBrush}" />
+
+            <ListView x:Name="DownloadsList" Grid.Column="2" BorderThickness="1,0,0,0" BorderBrush="{StaticResource LineBrush}"
+                      Foreground="{x:Static SystemColors.WindowTextBrush}" SelectionMode="Extended" MouseDoubleClick="OnRowDoubleClick" KeyDown="OnListKeyDown"
+                      GridViewColumnHeader.Click="OnColumnHeaderClick" ContextMenuOpening="OnRowMenuOpening"
+                      VirtualizingPanel.IsVirtualizing="True">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="MinHeight" Value="20" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem x:Name="MiOpen" Header="_Open" FontWeight="SemiBold" Click="OnOpenFile" />
+                        <MenuItem x:Name="MiFolder" Header="Open _folder" Click="OnOpenFolder" />
+                        <Separator />
+                        <MenuItem x:Name="MiResume" Header="_Resume" Click="OnResume" />
+                        <MenuItem x:Name="MiPause" Header="_Stop" Click="OnPause" />
+                        <MenuItem x:Name="MiProgress" Header="Show _progress" Click="OnShowProgress" />
+                        <Separator />
+                        <MenuItem x:Name="MiMove" Header="_Move/Rename..." Click="OnRelocate" />
+                        <MenuItem x:Name="MiCopy" Header="_Copy address" Click="OnCopyUrl" />
+                        <MenuItem x:Name="MiConvert" Header="Con_vert..." Click="OnConvert" />
+                        <Separator />
+                        <MenuItem Header="Re_move from list" InputGestureText="Del" Click="OnRemoveFromList" />
+                        <MenuItem Header="_Delete file" InputGestureText="Shift+Del" Click="OnDeleteFile" />
+                    </ContextMenu>
+                </ListView.ContextMenu>
+                <ListView.View>
+                    <GridView AllowsColumnReorder="True">
+                        <GridViewColumn Header="File Name" Width="290">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="16" Height="16" Margin="0,0,5,0" RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                            <Image.Source>
+                                                <MultiBinding Converter="{StaticResource FileIcon}">
+                                                    <Binding Path="FileName" Mode="OneWay" />
+                                                    <Binding Path="Kind" Mode="OneWay" />
+                                                </MultiBinding>
+                                            </Image.Source>
+                                        </Image>
+                                        <TextBlock Text="{Binding FileName, Mode=OneWay}" TextTrimming="CharacterEllipsis" ToolTip="{Binding FullPath, Mode=OneWay}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Size" Width="80">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate><TextBlock Text="{Binding SizeShort, Mode=OneWay}" TextAlignment="Right" /></DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Status" Width="86">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate><TextBlock Text="{Binding StatusShort, Mode=OneWay}" ToolTip="{Binding StatusText, Mode=OneWay}" /></DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Time left" Width="70" DisplayMemberBinding="{Binding EtaShort, Mode=OneWay}" />
+                        <GridViewColumn Header="Transfer rate" Width="90" DisplayMemberBinding="{Binding SpeedShort, Mode=OneWay}" />
+                        <GridViewColumn Header="Last Try Date" Width="118" DisplayMemberBinding="{Binding LastTryText, Mode=OneWay}" />
+                        <GridViewColumn Header="Address" Width="260" DisplayMemberBinding="{Binding Url, Mode=OneWay}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
+    </DockPanel>
 </Window>

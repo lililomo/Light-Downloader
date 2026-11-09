@@ -1,20 +1,27 @@
-const PORTS = [7414, 7415, 7416, 7417];
-
-async function ping() {
-  for (const p of PORTS) {
-    try { const r = await fetch(`http://127.0.0.1:${p}/ping`); if (r.ok) return p; } catch (e) { }
-  }
-  return null;
-}
+const api = globalThis.browser || globalThis.chrome;
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cb = document.getElementById('enabled');
-  try { const { enabled } = await chrome.storage.local.get({ enabled: true }); cb.checked = enabled; }
+  try { const { enabled } = await api.storage.local.get({ enabled: true }); cb.checked = enabled !== false; }
   catch (e) { cb.checked = true; }
-  cb.addEventListener('change', () => { try { chrome.storage.local.set({ enabled: cb.checked }); } catch (e) { } });
+  cb.addEventListener('change', () => { try { api.storage.local.set({ enabled: cb.checked }); } catch (e) { } });
 
-  const el = document.getElementById('status');
-  const port = await ping();
-  if (port) { el.textContent = `Connected · port ${port}`; el.className = 'status ok'; }
-  else { el.textContent = 'Desktop app not running'; el.className = 'status bad'; }
+  const box = document.getElementById('status');
+  const text = document.getElementById('statusText');
+  const hint = document.getElementById('hint');
+  let s = null;
+  try { s = await api.runtime.sendMessage({ type: 'status' }); } catch (e) { }
+  if (s && s.running) {
+    box.className = 'status ok';
+    text.textContent = `Connected to the desktop app (port ${s.port})`;
+    if (!s.capture) {
+      hint.hidden = false;
+      hint.textContent = 'Capturing is turned off for this browser in Light Downloader → Options → General.';
+    }
+  } else {
+    box.className = 'status bad';
+    text.textContent = 'Light Downloader is not running';
+    hint.hidden = false;
+    hint.textContent = 'Start the desktop app; until then the browser downloads files itself.';
+  }
 });

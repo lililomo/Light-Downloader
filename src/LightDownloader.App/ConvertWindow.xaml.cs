@@ -9,7 +9,6 @@ public partial class ConvertWindow : Window
     public ConvertWindow(string sourceName)
     {
         InitializeComponent();
-        WindowTheme.Apply(this);
         SourceText.Text = sourceName;
     }
 

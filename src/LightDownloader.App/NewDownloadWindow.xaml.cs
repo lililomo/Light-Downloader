@@ -12,17 +12,33 @@ using Microsoft.Win32;
 namespace LightDownloader.App;
 
 /// <summary>
-/// "New download" dialog (IDM's Download File Info): pick the file name, category and folder,
-/// optionally remember the folder for that category, then start now or later.
+/// IDM's "Download File Info" dialog: check the address, category and where to save (optionally
+/// remembering the folder for that category), pick a video quality, then start now or later.
 /// </summary>
 public partial class NewDownloadWindow : Window
 {
+    public sealed record Quality(string Id, string Label);
+
+    private static readonly Quality[] Qualities =
+    {
+        new("best", "Best available"),
+        new("2160", "2160p (4K)"),
+        new("1440", "1440p"),
+        new("1080", "1080p"),
+        new("720", "720p"),
+        new("480", "480p"),
+        new("360", "360p"),
+        new("m4a", "Audio only (M4A)"),
+        new("mp3", "Audio only (MP3)")
+    };
+
     private readonly DownloadManager _mgr = App.Current.Manager;
     private readonly DownloadRequest _req;
     private readonly bool _video;
     private readonly DispatcherTimer _probeDelay;
     private CancellationTokenSource? _probeCts;
     private long _probedSize = -1;
+    private string _folder = "", _name = "";
 
     // Track what the user changed by hand so probe results never overwrite it.
     private bool _programmatic, _nameEdited, _categoryEdited, _folderEdited;
@@ -30,7 +46,6 @@ public partial class NewDownloadWindow : Window
     public NewDownloadWindow(DownloadRequest? request, bool video)
     {
         InitializeComponent();
-        WindowTheme.Apply(this);
 
         _req = request ?? new DownloadRequest();
         _video = video || string.Equals(_req.Kind, "video", StringComparison.OrdinalIgnoreCase);
@@ -43,21 +58,23 @@ public partial class NewDownloadWindow : Window
         UrlBox.Text = !string.IsNullOrWhiteSpace(_req.Url) ? _req.Url : ClipboardUrl();
         if (_video)
         {
-            Title = HeaderTitle.Text = "New video download";
-            HeaderInfo.Text = "Video and audio are fetched with yt-dlp and merged into one file.";
-            NameBox.Text = "Named after the video's title";
-            NameBox.IsEnabled = false;
+            Title = "Download Video";
+            PathLabel.Text = "Save to";
             CategoryBox.SelectedItem = Categories.Video;
             CategoryBox.IsEnabled = false;
+            QualityBox.ItemsSource = QualityList(_req.Format);
+            QualityBox.SelectedValue = string.IsNullOrWhiteSpace(_req.Format) ? "best" : _req.Format;
+            InfoText.Text = string.IsNullOrWhiteSpace(_req.Title) ? "Named after the video title" : _req.Title;
+            InfoText.ToolTip = InfoText.Text;
         }
         else
         {
-            NameBox.Text = !string.IsNullOrWhiteSpace(_req.FileName)
-                ? HttpProbe.Sanitize(_req.FileName!)
-                : GuessName(UrlBox.Text);
-            CategoryBox.SelectedItem = Categories.FromFileName(NameBox.Text);
+            QualityLabel.Visibility = QualityBox.Visibility = Visibility.Collapsed;
+            _name = !string.IsNullOrWhiteSpace(_req.FileName) ? HttpProbe.Sanitize(_req.FileName!) : GuessName(UrlBox.Text);
+            CategoryBox.SelectedItem = Categories.FromFileName(_name);
         }
-        FolderBox.Text = !string.IsNullOrWhiteSpace(_req.SaveFolder) ? _req.SaveFolder! : _mgr.FolderFor(CurrentCategory);
+        _folder = !string.IsNullOrWhiteSpace(_req.SaveFolder) ? _req.SaveFolder! : _mgr.FolderFor(CurrentCategory);
+        ShowPath();
         _programmatic = false;
         // A name supplied by the browser (Content-Disposition / download attribute) is authoritative.
         _nameEdited = !string.IsNullOrWhiteSpace(_req.FileName);
@@ -74,6 +91,24 @@ public partial class NewDownloadWindow : Window
 
     private string CurrentCategory => CategoryBox.SelectedItem as string ?? Categories.Other;
 
+    private static List<Quality> QualityList(string? preset)
+    {
+        var list = Qualities.ToList();
+        // A height picked in the browser that isn't in the standard list (e.g. 240p).
+        if (int.TryParse(preset, out var h) && list.All(q => q.Id != preset))
+            list.Insert(list.FindIndex(q => int.TryParse(q.Id, out var x) && x < h) is var i and >= 0 ? i : list.Count - 2,
+                new Quality(preset!, $"{h}p"));
+        return list;
+    }
+
+    private void ShowPath()
+    {
+        bool was = _programmatic;
+        _programmatic = true;
+        PathBox.Text = _video ? _folder : Path.Combine(_folder, _name);
+        _programmatic = was;
+    }
+
     // ---- probing ---------------------------------------------------------------
 
     private async Task ProbeAsync()
@@ -82,13 +117,13 @@ public partial class NewDownloadWindow : Window
         var url = UrlBox.Text.Trim();
         if (!IsHttp(url))
         {
-            HeaderInfo.Text = "Enter an http:// or https:// address.";
+            InfoText.Text = "Enter an http:// or https:// address.";
             return;
         }
 
         _probeCts?.Cancel();
         var cts = _probeCts = new CancellationTokenSource();
-        HeaderInfo.Text = "Getting file info…";
+        InfoText.Text = "Getting file information…";
 
         var probe = await _mgr.ProbeAsync(new DownloadRequest
         {
@@ -102,20 +137,21 @@ public partial class NewDownloadWindow : Window
 
         if (probe == null)
         {
-            HeaderInfo.Text = "Couldn't reach the server — you can still start the download.";
+            InfoText.Text = _req.FileSize > 0 ? $"File size: {Formatting.Bytes(_req.FileSize)}" : "File size: unknown";
             return;
         }
 
         _programmatic = true;
         if (!_nameEdited && !string.IsNullOrWhiteSpace(probe.FileName) && probe.FileName != "download")
-            NameBox.Text = probe.FileName;
-        if (!_categoryEdited) CategoryBox.SelectedItem = Categories.FromFileName(NameBox.Text);
-        if (!_folderEdited) FolderBox.Text = _mgr.FolderFor(CurrentCategory);
+            _name = probe.FileName;
+        if (!_categoryEdited) CategoryBox.SelectedItem = Categories.FromFileName(_name);
+        if (!_folderEdited) _folder = _mgr.FolderFor(CurrentCategory);
+        ShowPath();
         _programmatic = false;
 
         _probedSize = probe.TotalSize;
-        HeaderInfo.Text = (probe.TotalSize > 0 ? Formatting.Bytes(probe.TotalSize) : "Unknown size") + "  ·  " +
-                          (probe.SupportsRanges ? "Resumable, multi-connection" : "Single connection, no resume");
+        InfoText.Text = "File size: " + (probe.TotalSize > 0 ? Formatting.Bytes(probe.TotalSize) : "unknown") +
+                        (probe.SupportsRanges ? "" : "\nThis server can't resume the download.");
         UpdateVisuals();
     }
 
@@ -127,9 +163,10 @@ public partial class NewDownloadWindow : Window
         if (!_nameEdited)
         {
             _programmatic = true;
-            NameBox.Text = GuessName(UrlBox.Text);
-            if (!_categoryEdited) CategoryBox.SelectedItem = Categories.FromFileName(NameBox.Text);
-            if (!_folderEdited) FolderBox.Text = _mgr.FolderFor(CurrentCategory);
+            _name = GuessName(UrlBox.Text);
+            if (!_categoryEdited) CategoryBox.SelectedItem = Categories.FromFileName(_name);
+            if (!_folderEdited) _folder = _mgr.FolderFor(CurrentCategory);
+            ShowPath();
             _programmatic = false;
         }
         _probeDelay.Stop();
@@ -137,18 +174,33 @@ public partial class NewDownloadWindow : Window
         UpdateVisuals();
     }
 
-    private void OnNameChanged(object sender, TextChangedEventArgs e)
+    private void OnPathChanged(object sender, TextChangedEventArgs e)
     {
-        if (!_programmatic && !_video)
+        if (_programmatic) return;
+        var text = PathBox.Text.Trim();
+        if (_video)
         {
-            _nameEdited = true;
-            if (!_categoryEdited)
+            _folder = text;
+            _folderEdited = true;
+        }
+        else
+        {
+            string folder, name;
+            try { folder = Path.GetDirectoryName(text) ?? ""; name = Path.GetFileName(text); }
+            catch { return; } // invalid while typing
+            if (!string.Equals(folder, _folder, StringComparison.OrdinalIgnoreCase)) _folderEdited = true;
+            if (name != _name)
             {
-                _programmatic = true;
-                CategoryBox.SelectedItem = Categories.FromFileName(NameBox.Text);
-                if (!_folderEdited) FolderBox.Text = _mgr.FolderFor(CurrentCategory);
-                _programmatic = false;
+                _nameEdited = true;
+                if (!_categoryEdited)
+                {
+                    _programmatic = true;
+                    CategoryBox.SelectedItem = Categories.FromFileName(name);
+                    _programmatic = false;
+                }
             }
+            _folder = folder;
+            _name = name;
         }
         UpdateVisuals();
     }
@@ -160,48 +212,51 @@ public partial class NewDownloadWindow : Window
             _categoryEdited = true;
             if (!_folderEdited)
             {
-                _programmatic = true;
-                FolderBox.Text = _mgr.FolderFor(CurrentCategory);
-                _programmatic = false;
+                _folder = _mgr.FolderFor(CurrentCategory);
+                ShowPath();
             }
         }
         UpdateVisuals();
     }
 
-    private void OnFolderChanged(object sender, TextChangedEventArgs e)
-    {
-        if (!_programmatic) _folderEdited = true;
-        UpdateVisuals();
-    }
-
     private void OnBrowse(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFolderDialog { Title = "Choose where to save" };
-        try { if (Directory.Exists(FolderBox.Text)) dlg.InitialDirectory = FolderBox.Text; } catch { }
-        if (dlg.ShowDialog(this) == true)
+        if (_video)
         {
-            FolderBox.Text = dlg.FolderName;  // marks the folder as user-chosen
-            RememberBox.IsChecked = true;     // picking a folder by hand usually means "keep using it"
+            var dlg = new OpenFolderDialog { Title = "Choose where to save the video" };
+            try { if (Directory.Exists(_folder)) dlg.InitialDirectory = _folder; } catch { }
+            if (dlg.ShowDialog(this) != true) return;
+            _folder = dlg.FolderName;
         }
+        else
+        {
+            var dlg = new SaveFileDialog { Title = "Save As", FileName = _name, Filter = "All files (*.*)|*.*", OverwritePrompt = false };
+            try { if (Directory.Exists(_folder)) dlg.InitialDirectory = _folder; } catch { }
+            if (dlg.ShowDialog(this) != true) return;
+            _folder = Path.GetDirectoryName(dlg.FileName) ?? _folder;
+            _name = Path.GetFileName(dlg.FileName);
+            _nameEdited = true;
+        }
+        _folderEdited = true;
+        ShowPath();
+        RememberBox.IsChecked = true; // picking a folder by hand usually means "keep using it"
+        UpdateVisuals();
     }
 
     private void UpdateVisuals()
     {
-        if (TypeBadge == null) return; // during InitializeComponent
+        if (TypeIcon == null) return; // during InitializeComponent
         var category = CurrentCategory;
-        TypeBadge.Background = CategoryVisuals.TintFor(category);
-        TypeGlyph.Text = CategoryVisuals.GlyphFor(category);
-        TypeGlyph.Foreground = CategoryVisuals.BrushFor(category);
-        RememberBox.Content = $"Remember this folder for {category} files";
+        TypeIcon.Source = ShellIcons.ForFile(_video ? "video.mp4" : _name, large: true);
+        RememberBox.Content = $"Remember this path for \"{category}\" category";
 
         string? warning = null;
         if (!_video)
         {
             try
             {
-                var name = NameBox.Text.Trim();
-                if (name.Length > 0 && File.Exists(Path.Combine(FolderBox.Text.Trim(), HttpProbe.Sanitize(name))))
-                    warning = $"A file named \"{name}\" already exists here — the new one will get a number added.";
+                if (_name.Length > 0 && File.Exists(Path.Combine(_folder, HttpProbe.Sanitize(_name))))
+                    warning = $"\"{_name}\" already exists in this folder; the new file will get a number added.";
             }
             catch { /* invalid path while typing */ }
         }
@@ -225,14 +280,14 @@ public partial class NewDownloadWindow : Window
         var url = UrlBox.Text.Trim();
         if (!IsHttp(url)) { ShowWarning("Enter a valid http:// or https:// address."); UrlBox.Focus(); return; }
 
-        var folder = FolderBox.Text.Trim();
-        if (folder.Length == 0) { ShowWarning("Choose a folder to save into."); return; }
+        var folder = _folder.Trim();
+        if (folder.Length == 0 || (!_video && _name.Trim().Length == 0)) { ShowWarning("Choose where to save the file."); PathBox.Focus(); return; }
         try { Directory.CreateDirectory(folder); }
         catch (Exception ex) { ShowWarning("Can't use this folder: " + ex.Message); return; }
 
         if (_video && start && !_mgr.Tools.HasYtDlp)
         {
-            ShowWarning("The video tools are still downloading in the background — try again in a moment, or choose Download later.");
+            ShowWarning("The video tools are still downloading in the background. Try again in a moment, or choose Download Later.");
             return;
         }
 
@@ -242,7 +297,9 @@ public partial class NewDownloadWindow : Window
         {
             Url = url,
             Kind = _video ? "video" : null,
-            FileName = _video ? null : NameBox.Text.Trim(),
+            Format = _video ? QualityBox.SelectedValue as string : null,
+            Title = _video ? _req.Title : null,
+            FileName = _video ? null : _name.Trim(),
             SaveFolder = folder,
             Referrer = _req.Referrer,
             UserAgent = _req.UserAgent,

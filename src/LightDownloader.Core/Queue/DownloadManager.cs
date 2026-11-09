@@ -125,7 +125,8 @@ public sealed class DownloadManager : IDisposable
         {
             Kind = DownloadKind.Video,
             Url = req.Url,
-            FileName = "(fetching video…)",
+            VideoFormat = req.Format,
+            FileName = string.IsNullOrWhiteSpace(req.Title) ? "(fetching video…)" : HttpProbe.Sanitize(req.Title!),
             SaveFolder = string.IsNullOrWhiteSpace(req.SaveFolder) ? FolderFor(Categories.Video) : req.SaveFolder!,
             Referrer = req.Referrer,
             UserAgent = req.UserAgent,
@@ -311,6 +312,25 @@ public sealed class DownloadManager : IDisposable
         cts.CancelAfter(TimeSpan.FromSeconds(15));
         try { return await HttpProbe.ProbeAsync(_http, probeItem, cts.Token).ConfigureAwait(false); }
         catch { return null; }
+    }
+
+    private readonly ConcurrentDictionary<string, (DateTime At, Task<MediaInfo> Task)> _mediaCache = new();
+
+    /// <summary>Qualities a video page offers (yt-dlp, no download). Results are cached for 10 minutes.</summary>
+    public Task<MediaInfo> GetMediaInfoAsync(DownloadRequest req)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var kv in _mediaCache)
+            if (now - kv.Value.At > TimeSpan.FromMinutes(10)) _mediaCache.TryRemove(kv.Key, out _);
+
+        var entry = _mediaCache.GetOrAdd(req.Url, _ => (now, Task.Run(async () =>
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            return await _video.GetMediaInfoAsync(req, cts.Token).ConfigureAwait(false);
+        })));
+        // A failure (e.g. tools still downloading, network down) shouldn't stick for 10 minutes.
+        _ = entry.Task.ContinueWith(t => _mediaCache.TryRemove(req.Url, out _), TaskContinuationOptions.NotOnRanToCompletion);
+        return entry.Task;
     }
 
     public void SetItemSpeedLimit(Guid id, long bytesPerSec)

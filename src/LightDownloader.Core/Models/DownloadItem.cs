@@ -15,6 +15,9 @@ public sealed class DownloadItem : INotifyPropertyChanged
     public int Connections { get; set; } = 8;
     public bool SupportsRanges { get; set; }
     public DownloadKind Kind { get; set; } = DownloadKind.Http;
+
+    /// <summary>Video quality passed to yt-dlp (see <see cref="DownloadRequest.Format"/>).</summary>
+    public string? VideoFormat { get; set; }
     public DateTime AddedAt { get; set; } = DateTime.Now;
     public DateTime? CompletedAt { get; set; }
     public DateTime? LastTryAt { get; set; }
@@ -119,6 +122,37 @@ public sealed class DownloadItem : INotifyPropertyChanged
 
     [JsonIgnore] public string SubLine => $"{Host} · {AddedAt:dd MMM yyyy, HH:mm}";
 
+    /// <summary>IDM's Status column: "Complete", a percentage, or the state.</summary>
+    [JsonIgnore]
+    public string StatusShort
+    {
+        get
+        {
+            bool known = TotalSize > 0 || PercentOverride.HasValue;
+            return _status switch
+            {
+                DownloadStatus.Completed => "Complete",
+                DownloadStatus.Error => "Error",
+                DownloadStatus.Queued => "Queued",
+                DownloadStatus.Connecting => "Connecting…",
+                DownloadStatus.Downloading when Kind == DownloadKind.Video && PercentOverride is null => "Getting info…",
+                _ when known && ProgressPercent > 0 => $"{ProgressPercent:0.00}%",
+                DownloadStatus.Paused => "Stopped",
+                _ => _status.ToString()
+            };
+        }
+    }
+
+    [JsonIgnore] public string LastTryText => (LastTryAt ?? AddedAt).ToString("MMM dd HH:mm:ss");
+
+    [JsonIgnore] public string EtaShort => EtaText == "—" ? "" : EtaText;
+
+    [JsonIgnore] public string SpeedShort => IsActive && SpeedBytesPerSec > 0 ? Formatting.Speed(SpeedBytesPerSec) : "";
+
+    [JsonIgnore]
+    public string SizeShort => TotalSize > 0 ? Formatting.Bytes(TotalSize)
+        : Kind == DownloadKind.Http && Downloaded > 0 ? Formatting.Bytes(Downloaded) : "";
+
     /// <summary>Short status shown under the progress bar in the list.</summary>
     [JsonIgnore]
     public string StatusLine
@@ -141,6 +175,9 @@ public sealed class DownloadItem : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Screen readers (UI Automation) announce a row by this.</summary>
+    public override string ToString() => FileName;
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private static readonly string[] NotifyProps =
@@ -148,7 +185,8 @@ public sealed class DownloadItem : INotifyPropertyChanged
         nameof(Status), nameof(StatusText), nameof(StatusLine), nameof(Downloaded), nameof(Progress),
         nameof(ProgressPercent), nameof(SizeText), nameof(SpeedText), nameof(EtaText),
         nameof(TotalSize), nameof(FileName), nameof(Category), nameof(IsActive), nameof(Host),
-        nameof(SubLine), nameof(SaveFolder), nameof(SpeedLimitBytesPerSec)
+        nameof(SubLine), nameof(SaveFolder), nameof(SpeedLimitBytesPerSec), nameof(StatusShort),
+        nameof(LastTryText), nameof(SizeShort), nameof(EtaShort), nameof(SpeedShort)
     };
 
     /// <summary>Raise change notifications for all display properties. Call on the UI thread.</summary>

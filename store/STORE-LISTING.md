@@ -25,7 +25,10 @@ off to it automatically, so it can be downloaded faster using multiple parallel
 connections, with pause/resume, a queue, and a speed limiter.
 
 Features:
-• Automatic capture of browser downloads (toggle on/off from the popup)
+• Automatic capture of browser downloads (toggle on/off from the popup); choose
+  which file types and which browsers are captured in the desktop app's Options
+• "Download this video" button over video players, with a choice of quality
+  (e.g. 1080p, 720p, audio only)
 • Right-click a link, image, audio or video → "Download with Light Downloader"
 • Right-click a page → "Download video from this page" (grabbed with yt-dlp)
 • Passes the site's cookies, referrer and user-agent so downloads that need your

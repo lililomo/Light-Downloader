@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using LightDownloader.Core.Models;
 using LightDownloader.Core.Tools;
@@ -37,30 +38,13 @@ public sealed class YtDlpRunner
         };
         psi.ArgumentList.Add("--newline");
         psi.ArgumentList.Add("--no-playlist");
-        psi.ArgumentList.Add("-f");
-        psi.ArgumentList.Add("bv*+ba/b");
-        psi.ArgumentList.Add("--merge-output-format");
-        psi.ArgumentList.Add("mp4");
+        AddFormatArgs(psi.ArgumentList, item.VideoFormat);
         if (_tools.HasFfmpeg)
         {
             psi.ArgumentList.Add("--ffmpeg-location");
             psi.ArgumentList.Add(_tools.ToolsDir);
         }
-        if (!string.IsNullOrEmpty(item.Referrer))
-        {
-            psi.ArgumentList.Add("--referer");
-            psi.ArgumentList.Add(item.Referrer);
-        }
-        if (!string.IsNullOrEmpty(item.Cookies))
-        {
-            psi.ArgumentList.Add("--add-header");
-            psi.ArgumentList.Add("Cookie:" + item.Cookies);
-        }
-        if (!string.IsNullOrEmpty(item.UserAgent))
-        {
-            psi.ArgumentList.Add("--add-header");
-            psi.ArgumentList.Add("User-Agent:" + item.UserAgent);
-        }
+        AddRequestArgs(psi.ArgumentList, item.Referrer, item.Cookies, item.UserAgent);
         psi.ArgumentList.Add("-o");
         psi.ArgumentList.Add(Path.Combine(item.SaveFolder, "%(title)s.%(ext)s"));
         psi.ArgumentList.Add(item.Url);
@@ -120,6 +104,81 @@ public sealed class YtDlpRunner
             catch { /* keep placeholder name */ }
         }
         item.PercentOverride = 100;
+    }
+
+    /// <summary>yt-dlp format selection for a quality picked in the browser or the New-download dialog.</summary>
+    private void AddFormatArgs(IList<string> args, string? format)
+    {
+        bool ffmpeg = _tools.HasFfmpeg;
+        switch (format?.ToLowerInvariant())
+        {
+            case "m4a":
+                args.Add("-f"); args.Add("ba[ext=m4a]/ba/b");
+                if (ffmpeg) { args.Add("-x"); args.Add("--audio-format"); args.Add("m4a"); }
+                return;
+            case "mp3" when ffmpeg:
+                args.Add("-f"); args.Add("ba/b");
+                args.Add("-x"); args.Add("--audio-format"); args.Add("mp3"); args.Add("--audio-quality"); args.Add("0");
+                return;
+        }
+        // Highest resolution up to the chosen height; at equal resolution prefer H.264/AAC so the MP4 plays everywhere.
+        args.Add("-f");
+        args.Add(int.TryParse(format, out var h) && h > 0 ? $"bv*[height<={h}]+ba/b[height<={h}]/bv*+ba/b" : "bv*+ba/b");
+        args.Add("-S"); args.Add("res,vcodec:h264,ext:mp4:m4a");
+        args.Add("--merge-output-format"); args.Add("mp4");
+    }
+
+    private static void AddRequestArgs(IList<string> args, string? referrer, string? cookies, string? userAgent)
+    {
+        if (!string.IsNullOrEmpty(referrer)) { args.Add("--referer"); args.Add(referrer); }
+        if (!string.IsNullOrEmpty(cookies)) { args.Add("--add-header"); args.Add("Cookie:" + cookies); }
+        if (!string.IsNullOrEmpty(userAgent)) { args.Add("--add-header"); args.Add("User-Agent:" + userAgent); }
+    }
+
+    /// <summary>Asks yt-dlp (without downloading) which qualities a page offers, for the browser's video button.</summary>
+    public async Task<MediaInfo> GetMediaInfoAsync(DownloadRequest req, CancellationToken ct)
+    {
+        if (!_tools.HasYtDlp)
+            throw new InvalidOperationException("The video tools are still downloading. Try again in a minute.");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = _tools.YtDlpPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        psi.ArgumentList.Add("-J");
+        psi.ArgumentList.Add("--no-playlist");
+        psi.ArgumentList.Add("--no-warnings");
+        AddRequestArgs(psi.ArgumentList, req.Referrer, req.Cookies, req.UserAgent);
+        psi.ArgumentList.Add(req.Url);
+
+        using var proc = new Process { StartInfo = psi };
+        proc.Start();
+        var stdout = proc.StandardOutput.ReadToEndAsync(ct);
+        var stderr = proc.StandardError.ReadToEndAsync(ct);
+        try
+        {
+            await proc.WaitForExitAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); } catch { }
+            throw;
+        }
+
+        var json = await stdout.ConfigureAwait(false);
+        if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(json))
+        {
+            var err = (await stderr.ConfigureAwait(false)).Trim();
+            var line = err.Split('\n').LastOrDefault(l => l.Contains("ERROR", StringComparison.Ordinal)) ?? err;
+            throw new Exception(line.Contains("Unsupported URL", StringComparison.OrdinalIgnoreCase)
+                ? "No downloadable video was found on this page."
+                : line.Replace("ERROR: ", "").Trim());
+        }
+        return MediaInfo.Parse(json, _tools.HasFfmpeg);
     }
 
     private static long ParseSize(string num, string unit)

@@ -7,15 +7,14 @@ namespace LightDownloader.App;
 /// <summary>IDM-style map of a download: one block per connection, filled as that connection receives data.</summary>
 public sealed class SegmentBar : FrameworkElement
 {
-    private static readonly Brush Track = Frozen(Color.FromRgb(0x2A, 0x2F, 0x39));
-    private static readonly Brush Gap = Frozen(Color.FromRgb(0x14, 0x16, 0x1B));
+    private static readonly Brush Track = Frozen(Color.FromRgb(0xFF, 0xFF, 0xFF));
+    private static readonly Brush Fill = Frozen(Color.FromRgb(0x2E, 0x7B, 0xD6));
+    private static readonly Brush Divider = Frozen(Color.FromRgb(0xA0, 0xA0, 0xA0));
 
     private (double Start, double Length, double Done)[] _parts = Array.Empty<(double, double, double)>();
-    private Brush _fill = Frozen(Color.FromRgb(0x4F, 0x7D, 0xFF));
 
-    public void Update(IReadOnlyList<SegmentState> segments, long total, Brush fill)
+    public void Update(IReadOnlyList<SegmentState> segments, long total)
     {
-        _fill = fill;
         if (total <= 0 || segments.Count == 0)
         {
             _parts = Array.Empty<(double, double, double)>();
@@ -39,16 +38,14 @@ public sealed class SegmentBar : FrameworkElement
         double w = ActualWidth, h = ActualHeight;
         if (w <= 0 || h <= 0) return;
 
-        dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h), 4, 4));
         dc.DrawRectangle(Track, null, new Rect(0, 0, w, h));
         for (int i = 0; i < _parts.Length; i++)
         {
             var (start, length, done) = _parts[i];
             double x = start * w;
-            if (done > 0) dc.DrawRectangle(_fill, null, new Rect(x, 0, length * w * done, h));
-            if (i > 0) dc.DrawRectangle(Gap, null, new Rect(x - 1, 0, 2, h)); // block divider
+            if (done > 0) dc.DrawRectangle(Fill, null, new Rect(x, 0, length * w * done, h));
+            if (i > 0) dc.DrawRectangle(Divider, null, new Rect(Math.Round(x), 0, 1, h)); // block divider
         }
-        dc.Pop();
     }
 
     private static Brush Frozen(Color c)

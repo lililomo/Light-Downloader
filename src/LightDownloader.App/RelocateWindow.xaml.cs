@@ -15,7 +15,6 @@ public partial class RelocateWindow : Window
     public RelocateWindow(DownloadItem item)
     {
         InitializeComponent();
-        WindowTheme.Apply(this);
         _item = item;
 
         CurrentText.Text = "Currently: " + item.FullPath;

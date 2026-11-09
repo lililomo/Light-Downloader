@@ -7,21 +7,24 @@ Download: https://beliaja.id/light-downloader/
 
 ## Features
 
-- **IDM-style interface** — dark, native-feeling window with a categories sidebar (live counts),
-  colored file-type icons, status-colored progress, search, and a live speed card. Adapts to narrow
-  and portrait screens.
-- **Per-download progress window** — segment map (one block per connection), connection table,
-  transfer rate, time left, resume capability, Open / Open folder when finished.
-- **Ask where to save** — every new download (typed or captured from the browser) opens a dialog
-  with the size, category (auto-detected) and folder; the folder can be remembered per category.
+- **IDM-style interface** — a plain Windows window: menu bar, toolbar, categories tree, and a
+  download list with File Name / Size / Status / Time left / Transfer rate / Last Try Date columns
+  (sortable) and Explorer's file-type icons.
+- **Per-download progress window** — IDM's dialog: Download status / Speed Limiter / Options on
+  completion tabs, segment map (one block per connection) and connection table.
+- **Ask where to save** — every new download (typed or captured from the browser) opens a
+  "Download File Info" dialog with the size, category (auto-detected) and Save As path; the path can
+  be remembered per category.
+- **Options** — General (start with Windows, which browsers to capture, video button), File Types
+  (IDM's default list of extensions to capture, sites to skip), Connection, Save To, Downloads.
 - **Change location** — move or rename any download, partial or finished.
 - **Multi-connection downloads** — splits each file into parallel byte-range connections (default 8) for speed.
 - **Resume** — survives pause and app restart (progress is saved with the download list).
 - **Robust connections** — server timeouts and stalled connections are detected and reconnected automatically.
 - **Queue** — limits how many downloads run at once; the rest wait.
 - **Speed limiter** — global cap, plus an optional per-download cap in the progress window.
-- **Browser capture** — Chrome (MV3) + Firefox extensions intercept downloads, cancel the browser's own download, and hand the URL + cookies + referrer/User-Agent to the app.
-- **Video grabber** — "Add video" / right-click "Download video from this page" grabs video with **yt-dlp** and merges video+audio with **ffmpeg**.
+- **Browser capture** — Chrome (MV3) + Firefox extensions take over downloads of the listed file types and hand the URL + cookies + referrer/User-Agent to the app. Chrome decides when the browser names the file (`downloads.onDeterminingFilename`); Firefox when the response arrives (`webRequest`), so Firefox's own Save dialog never appears first.
+- **Video grabber** — a "Download this video" button over web players (like IDM's panel) lists the qualities yt-dlp finds (e.g. 2160p … 144p, M4A, MP3); "Video" / right-click "Download video from this page" do the same from the app. Video and audio are merged with **ffmpeg**.
 - **Media converter** — convert/remux a finished file (MP4 / MKV / MP3 / M4A / WAV) with ffmpeg.
 - **Simple scheduler** — optional daily "start all at HH:mm" / "pause all at HH:mm".
 - **System tray** — closing the window hides to tray; the app keeps running.
@@ -41,6 +44,8 @@ Double-click **`installer/LightDownloaderSetup.exe`**, a standard Windows setup 
 (English and Indonesian). It installs to `%LocalAppData%\Programs\Light Downloader` by default,
 adds Start Menu and optional Desktop shortcuts, registers an entry in *Add/Remove Programs*, and
 can launch the app when it finishes (the app then downloads ffmpeg + yt-dlp in the background).
+On the last page it also offers to open the Chrome Web Store page in Chrome and the Firefox
+Add-ons page in Firefox, for each browser that is installed and doesn't have the extension yet.
 No administrator rights are needed for the app itself. If the .NET 8 Desktop Runtime is missing,
 the wizard offers to download and install it from Microsoft, which asks for elevation.
 
@@ -62,6 +67,11 @@ dotnet run --project "src/LightDownloader.App/LightDownloader.App.csproj" -c Rel
 The built executable: `src/LightDownloader.App/bin/Release/net8.0-windows/LightDownloader.exe`
 
 ## Install the browser extensions
+
+From the stores: [Chrome Web Store](https://chromewebstore.google.com/detail/light-downloader-integrat/oaghadmejhjmmkagkdimogebdncmmpci)
+· [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/light-downloader-integration/).
+
+For development:
 
 **Chrome / Edge** — go to `chrome://extensions`, enable *Developer mode*, click
 *Load unpacked*, and select `extension/chrome`.

@@ -1,30 +1,30 @@
 <Window x:Class="LightDownloader.App.RelocateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:LightDownloader.App"
-        Title="Change location" Width="580" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner" Style="{StaticResource WindowStyle}">
-    <StackPanel Margin="26,22,26,22">
-        <TextBlock Text="Change location" FontSize="17" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentText" Foreground="{StaticResource SubTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap" />
-
-        <TextBlock Text="Folder" Style="{StaticResource FieldLabel}" Margin="0,18,0,6" />
-        <DockPanel>
-            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Margin="8,0,0,0"
-                    local:IconProps.Glyph="&#xE838;" ToolTip="Choose a folder" Click="OnBrowse" />
-            <TextBox x:Name="FolderBox" />
-        </DockPanel>
-
-        <TextBlock Text="File name" Style="{StaticResource FieldLabel}" />
-        <TextBox x:Name="NameBox" />
-
-        <TextBlock x:Name="NoteText" FontSize="12" Foreground="{StaticResource SubTextBrush}" Margin="0,14,0,0" TextWrapping="Wrap" />
-        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
-
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
-            <Button Content="Cancel" IsCancel="True" MinWidth="92" />
-            <Button x:Name="MoveButton" Content="Move" Style="{StaticResource PrimaryButton}" IsDefault="True"
-                    MinWidth="110" Margin="10,0,0,0" Click="OnMove" />
+        Title="Move/Rename" Width="520" Style="{StaticResource DialogWindow}" WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="12">
+        <TextBlock x:Name="CurrentText" Style="{StaticResource Hint}" />
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Folder" Style="{StaticResource Label}" />
+            <TextBox x:Name="FolderBox" Grid.Column="1" />
+            <Button Grid.Column="2" Content="..." Width="30" Height="23" Margin="5,0,0,0" ToolTip="Choose a folder" Click="OnBrowse" />
+            <TextBlock Grid.Row="1" Text="File name" Style="{StaticResource Label}" Margin="0,8,10,0" />
+            <TextBox x:Name="NameBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,8,0,0" />
+        </Grid>
+        <TextBlock x:Name="NoteText" Style="{StaticResource Hint}" Margin="0,10,0,0" />
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource ErrorTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="MoveButton" Content="OK" Style="{StaticResource DlgButton}" IsDefault="True" Click="OnMove" />
+            <Button Content="Cancel" Style="{StaticResource DlgButton}" IsCancel="True" />
         </StackPanel>
     </StackPanel>
 </Window>

@@ -1,11 +1,14 @@
 {
   "manifest_version": 2,
   "name": "Light Downloader Integration",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Capture browser downloads and send them to the Light Downloader desktop app for faster, multi-connection downloading.",
   "author": "Light Downloader",
-  "permissions": ["downloads", "cookies", "contextMenus", "storage", "<all_urls>"],
+  "permissions": ["downloads", "cookies", "contextMenus", "storage", "webRequest", "webRequestBlocking", "<all_urls>"],
   "background": { "scripts": ["background.js"], "persistent": false },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["content.js"], "all_frames": true, "run_at": "document_idle" }
+  ],
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "Light Downloader",

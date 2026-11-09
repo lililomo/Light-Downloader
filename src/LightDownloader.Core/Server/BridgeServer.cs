@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using LightDownloader.Core.Models;
 using LightDownloader.Core.Queue;
+using LightDownloader.Core.Video;
 
 namespace LightDownloader.Core.Server;
 
@@ -20,6 +21,13 @@ public sealed class BridgeServer : IDisposable
 
     public int Port { get; private set; }
     public bool Running { get; private set; }
+
+    /// <summary>Reported to the extension in /ping and /config.</summary>
+    public string AppVersion { get; set; } = "1.0";
+
+    /// <summary>Browsers that contacted the bridge (key → last time), for the Options dialog.</summary>
+    public IReadOnlyDictionary<string, DateTime> SeenBrowsers => _seen;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _seen = new();
 
     public event Action<DownloadItem>? DownloadCaptured;
 
@@ -84,11 +92,60 @@ public sealed class BridgeServer : IDisposable
                 if (method == "OPTIONS") { await WriteAsync(stream, 204, origin, null).ConfigureAwait(false); return; }
                 if (!allowed) { await WriteJsonAsync(stream, 403, origin, new { ok = false, error = "origin not allowed" }).ConfigureAwait(false); return; }
 
+                var query = "";
+                int q = path.IndexOf('?');
+                if (q >= 0) { query = path[(q + 1)..]; path = path[..q]; }
+
                 switch (path)
                 {
                     case "/ping":
-                        await WriteJsonAsync(stream, 200, origin, new { ok = true, app = "LightDownloader", version = "1.0" }).ConfigureAwait(false);
+                        await WriteJsonAsync(stream, 200, origin, new { ok = true, app = "LightDownloader", version = AppVersion }).ConfigureAwait(false);
                         break;
+
+                    case "/config":
+                    {
+                        // What the extension should capture; it asks again every few seconds while in use.
+                        var browser = QueryValue(query, "browser");
+                        if (!string.IsNullOrEmpty(browser)) _seen[browser.ToLowerInvariant()] = DateTime.Now;
+                        var s = _mgr.Settings;
+                        await WriteJsonAsync(stream, 200, origin, new
+                        {
+                            ok = true,
+                            app = "LightDownloader",
+                            version = AppVersion,
+                            capture = s.CapturesBrowser(browser),
+                            fileTypes = AppSettings.SplitList(s.CaptureFileTypes).Select(t => t.TrimStart('.').ToUpperInvariant()),
+                            skipSites = AppSettings.SplitList(s.SkipSites),
+                            videoButton = s.VideoButton
+                        }).ConfigureAwait(false);
+                        break;
+                    }
+
+                    case "/media/formats":
+                    {
+                        DownloadRequest? mr = null;
+                        try { mr = JsonSerializer.Deserialize<DownloadRequest>(body, Json); } catch { }
+                        if (mr == null || string.IsNullOrWhiteSpace(mr.Url))
+                        {
+                            await WriteJsonAsync(stream, 400, origin, new { ok = false, error = "missing url" }).ConfigureAwait(false);
+                            break;
+                        }
+                        try
+                        {
+                            var info = await _mgr.GetMediaInfoAsync(mr).ConfigureAwait(false);
+                            await WriteJsonAsync(stream, 200, origin, new
+                            {
+                                ok = true,
+                                title = info.Title,
+                                options = info.Options.Select(o => new { id = o.Id, label = o.Label, detail = o.Detail, size = MediaInfo.SizeText(o.Size) })
+                            }).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            await WriteJsonAsync(stream, 200, origin, new { ok = false, error = ex.Message }).ConfigureAwait(false);
+                        }
+                        break;
+                    }
 
                     case "/add":
                         DownloadRequest? dr = null;
@@ -169,6 +226,16 @@ public sealed class BridgeServer : IDisposable
 
         var body = Encoding.UTF8.GetString(bodyBytes.GetBuffer(), 0, (int)bodyBytes.Length);
         return (method, path, headers, body);
+    }
+
+    private static string QueryValue(string query, string key)
+    {
+        foreach (var pair in query.Split('&'))
+        {
+            int eq = pair.IndexOf('=');
+            if (eq > 0 && pair[..eq] == key) return Uri.UnescapeDataString(pair[(eq + 1)..]);
+        }
+        return "";
     }
 
     private static int IndexOfDoubleCrlf(byte[] buf, int len)

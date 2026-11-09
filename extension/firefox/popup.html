@@ -3,18 +3,26 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { font: 13px/1.4 system-ui, "Segoe UI", sans-serif; width: 240px; margin: 0; padding: 12px; }
-    h1 { font-size: 14px; margin: 0 0 8px; }
-    .status { padding: 6px 8px; border-radius: 6px; margin-bottom: 10px; }
-    .ok { background: #e6f5e9; color: #1b7a33; }
-    .bad { background: #fdecec; color: #b42318; }
-    label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    body { font: 12px/1.45 "Segoe UI", system-ui, sans-serif; width: 250px; margin: 0; color: #1b1b1b; background: #fff; }
+    header { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid #e0e0e0; background: #f3f3f3; }
+    header img { width: 20px; height: 20px; }
+    header b { font-size: 13px; font-weight: 600; }
+    main { padding: 10px 12px 12px; }
+    .status { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #9e9e9e; flex: none; }
+    .ok .dot { background: #107c10; }
+    .bad .dot { background: #c42b1c; }
+    .hint { color: #666; margin: -4px 0 10px 16px; }
+    label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>Light Downloader</h1>
-  <div id="status" class="status">Checking…</div>
-  <label><input type="checkbox" id="enabled"> Capture browser downloads</label>
+  <header><img src="icons/icon32.png" alt=""><b>Light Downloader</b></header>
+  <main>
+    <div id="status" class="status"><span class="dot"></span><span id="statusText">Checking…</span></div>
+    <div id="hint" class="hint" hidden></div>
+    <label><input type="checkbox" id="enabled"> Capture downloads in this browser</label>
+  </main>
   <script src="popup.js"></script>
 </body>
 </html>

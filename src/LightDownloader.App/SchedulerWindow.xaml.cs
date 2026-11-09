@@ -10,7 +10,6 @@ public partial class SchedulerWindow : Window
     public SchedulerWindow(AppSettings s)
     {
         InitializeComponent();
-        WindowTheme.Apply(this);
         Result = s;
         EnabledBox.IsChecked = s.SchedulerEnabled;
         StartBox.Text = s.StartTime ?? "";

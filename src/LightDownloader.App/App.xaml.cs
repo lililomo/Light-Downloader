@@ -1,8 +1,11 @@
+using System.IO;
+using System.Reflection;
 using System.Windows;
 using LightDownloader.Core.Models;
 using LightDownloader.Core.Queue;
 using LightDownloader.Core.Server;
 using Drawing = System.Drawing;
+using Microsoft.Win32;
 using WF = System.Windows.Forms;
 
 namespace LightDownloader.App;
@@ -21,19 +24,32 @@ public partial class App : Application
 
     public static new App Current => (App)Application.Current;
 
+#if DEBUG
+    // Debug builds keep their own identity and data so they run beside an installed copy.
+    private const string Instance = "LightDownloader_Dev";
+#else
+    private const string Instance = "LightDownloader";
+#endif
+    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+
     private void OnStartup(object sender, StartupEventArgs e)
     {
-        _mutex = new Mutex(true, "LightDownloader_SingleInstance_8F2A", out bool isNew);
+        _mutex = new Mutex(true, Instance + "_SingleInstance_8F2A", out bool isNew);
         if (!isNew) { Shutdown(); return; }
 
         // The installer and uninstaller signal this to close a running copy cleanly (it lives in the tray).
-        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "LightDownloader_Exit_8F2A");
+        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, Instance + "_Exit_8F2A");
         ThreadPool.RegisterWaitForSingleObject(_exitSignal,
             (_, _) => Dispatcher.InvokeAsync(ExitApp), null, Timeout.Infinite, executeOnlyOnce: true);
 
-        Manager = new DownloadManager();
-        Server = new BridgeServer(Manager);
+        Manager = new DownloadManager(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Instance));
+        Server = new BridgeServer(Manager)
+        {
+            AppVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0"
+        };
         try { Server.Start(Manager.Settings.ServerPort); } catch { /* bridge optional */ }
+        ApplyRunAtStartup(Manager.Settings.RunAtStartup);
 
         // Fetch yt-dlp + ffmpeg in the background (not bundled) so video/convert work later.
         Manager.Tools.EnsureInBackground();
@@ -66,7 +82,34 @@ public partial class App : Application
             if (_progress.TryGetValue(item.Id, out var w)) w.Close();
         });
 
-        if (!Manager.Settings.StartMinimized) _main.Show();
+        // Windows starts us with --tray (see ApplyRunAtStartup): stay in the notification area.
+        bool tray = e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase);
+        if (!tray && !Manager.Settings.StartMinimized) _main.Show();
+    }
+
+    /// <summary>Adds or removes the "start with Windows" entry (per user; no admin rights needed).</summary>
+    private static void ApplyRunAtStartup(bool enabled)
+    {
+#if !DEBUG
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(RunKey);
+            if (enabled && Environment.ProcessPath is { } exe) key.SetValue("LightDownloader", $"\"{exe}\" --tray");
+            else key.DeleteValue("LightDownloader", throwOnMissingValue: false);
+        }
+        catch { /* policy may block it; the option just has no effect */ }
+#endif
+    }
+
+    /// <summary>Opens the Options dialog and applies what the user saved.</summary>
+    public void ShowOptions(Window? owner)
+    {
+        var w = new SettingsWindow(Manager.Settings, Server.SeenBrowsers);
+        if (owner is { IsVisible: true }) w.Owner = owner;
+        else w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        if (w.ShowDialog() != true) return;
+        Manager.UpdateSettings(w.Result);
+        ApplyRunAtStartup(w.Result.RunAtStartup);
     }
 
     /// <summary>Opens the New-download dialog (from the toolbar, the tray, or a browser capture).</summary>
@@ -114,6 +157,7 @@ public partial class App : Application
         var menu = new WF.ContextMenuStrip();
         menu.Items.Add("Open Light Downloader", null, (_, _) => ShowMain());
         menu.Items.Add("Add URL…", null, (_, _) => ShowNewDownload(null));
+        menu.Items.Add("Options…", null, (_, _) => ShowOptions(_main.IsVisible ? _main : null));
         menu.Items.Add(new WF.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
         _tray.ContextMenuStrip = menu;

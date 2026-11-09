@@ -2,6 +2,8 @@
 
 #define AppName "Light Downloader"
 #define AppExe "LightDownloader.exe"
+#define ChromeStoreUrl "https://chromewebstore.google.com/detail/light-downloader-integrat/oaghadmejhjmmkagkdimogebdncmmpci"
+#define FirefoxAddonUrl "https://addons.mozilla.org/en-US/firefox/addon/light-downloader-integration/"
 #define Root SourcePath + ".."
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -47,7 +49,8 @@ english.RuntimeReady=Also download and install the .NET 8 Desktop Runtime from M
 english.RuntimeFailed=The .NET 8 Desktop Runtime could not be installed, so Light Downloader will not start yet.%n%nSetup will still install the app. Install the runtime (Desktop Runtime, x64) afterwards from:%nhttps://dotnet.microsoft.com/download/dotnet/8.0
 english.AppRunning=Light Downloader is running and will be closed now.%n%nDownloads in progress will stop and can be resumed later.
 english.AppStillRunning=Light Downloader is still running. Close it from its tray icon, then try again.
-english.OpenExtensionPage=Open the browser extension page
+english.InstallChromeExt=Install the browser extension in Google Chrome
+english.InstallFirefoxExt=Install the browser add-on in Mozilla Firefox
 english.RemoveUserData=Also delete your Light Downloader settings, download list and its downloaded tools (ffmpeg, yt-dlp)?%n%nFiles you downloaded are not affected.
 indonesian.RuntimeDownloadTitle=Mengunduh .NET 8 Desktop Runtime
 indonesian.RuntimeDownloadDesc=Light Downloader memerlukan komponen gratis dari Microsoft ini (sekitar 60 MB).
@@ -55,7 +58,8 @@ indonesian.RuntimeReady=Mengunduh dan memasang juga .NET 8 Desktop Runtime dari 
 indonesian.RuntimeFailed=.NET 8 Desktop Runtime tidak berhasil dipasang, jadi Light Downloader belum bisa dijalankan.%n%nAplikasi tetap akan dipasang. Pasang runtime-nya (Desktop Runtime, x64) nanti dari:%nhttps://dotnet.microsoft.com/download/dotnet/8.0
 indonesian.AppRunning=Light Downloader sedang berjalan dan akan ditutup sekarang.%n%nUnduhan yang sedang berjalan akan berhenti dan bisa dilanjutkan nanti.
 indonesian.AppStillRunning=Light Downloader masih berjalan. Tutup dari ikon di tray, lalu coba lagi.
-indonesian.OpenExtensionPage=Buka halaman ekstensi browser
+indonesian.InstallChromeExt=Pasang ekstensi browser di Google Chrome
+indonesian.InstallFirefoxExt=Pasang add-on browser di Mozilla Firefox
 indonesian.RemoveUserData=Hapus juga pengaturan, daftar unduhan, dan alat yang diunduh Light Downloader (ffmpeg, yt-dlp)?%n%nBerkas hasil unduhan Anda tidak terpengaruh.
 
 [Tasks]
@@ -84,13 +88,19 @@ Type: dirifempty; Name: "{app}"
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent; Check: RuntimeInstalled
-Filename: "https://beliaja.id/light-downloader/extension/"; Description: "{cm:OpenExtensionPage}"; Flags: nowait postinstall shellexec skipifsilent unchecked
+; The stores only let the user add an extension themselves, so open each store page in its own browser.
+Filename: "{code:ChromeExe}"; Parameters: """{#ChromeStoreUrl}"""; Description: "{cm:InstallChromeExt}"; Flags: nowait postinstall skipifsilent; Check: ChromeNeedsExtension
+Filename: "{code:FirefoxExe}"; Parameters: """{#FirefoxAddonUrl}"""; Description: "{cm:InstallFirefoxExt}"; Flags: nowait postinstall skipifsilent; Check: FirefoxNeedsExtension
 
 [Code]
 const
   AppMutex = 'LightDownloader_SingleInstance_8F2A';
   ExitSignal = 'LightDownloader_Exit_8F2A';
   LegacyKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\LightDownloader';
+  RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  AppPathsKey = 'Software\Microsoft\Windows\CurrentVersion\App Paths\';
+  ChromeExtensionId = 'oaghadmejhjmmkagkdimogebdncmmpci';
+  FirefoxAddonId = '{a7c3e4f2-9b1d-4e6a-8c2f-1d3b5e7a9c11}';
   RuntimeUrl = 'https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe';
   RuntimeFile = 'windowsdesktop-runtime-8-win-x64.exe';
   EVENT_MODIFY_STATE = $0002;
@@ -118,6 +128,60 @@ begin
   Result := FindFirst(ExpandConstant('{commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\8.*'), Found);
   if Result then
     FindClose(Found);
+end;
+
+{ Full path of an installed browser (from App Paths), or '' when it isn't installed. }
+function BrowserPath(Exe: String): String;
+begin
+  Result := '';
+  if not RegQueryStringValue(HKCU, AppPathsKey + Exe, '', Result) then
+    if not RegQueryStringValue(HKLM, AppPathsKey + Exe, '', Result) then
+      RegQueryStringValue(HKLM32, AppPathsKey + Exe, '', Result);
+  Result := RemoveQuotes(Result);
+  if (Result <> '') and not FileExists(Result) then
+    Result := '';
+end;
+
+function ChromeExe(Param: String): String;
+begin
+  Result := BrowserPath('chrome.exe');
+end;
+
+function FirefoxExe(Param: String): String;
+begin
+  Result := BrowserPath('firefox.exe');
+end;
+
+{ True when a profile folder under Base contains Child (i.e. the extension is installed there). }
+function AnyProfileHas(Base, Child: String): Boolean;
+var
+  F: TFindRec;
+begin
+  Result := False;
+  if FindFirst(Base + '*', F) then
+  begin
+    try
+      repeat
+        if (F.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and (F.Name <> '.') and (F.Name <> '..') then
+          if FileOrDirExists(Base + F.Name + Child) then
+            Result := True;
+      until Result or not FindNext(F);
+    finally
+      FindClose(F);
+    end;
+  end;
+end;
+
+function ChromeNeedsExtension: Boolean;
+begin
+  Result := (ChromeExe('') <> '') and
+    not AnyProfileHas(ExpandConstant('{localappdata}\Google\Chrome\User Data\'), '\Extensions\' + ChromeExtensionId);
+end;
+
+function FirefoxNeedsExtension: Boolean;
+begin
+  Result := (FirefoxExe('') <> '') and
+    not AnyProfileHas(ExpandConstant('{userappdata}\Mozilla\Firefox\Profiles\'), '\extensions\' + FirefoxAddonId + '.xpi');
 end;
 
 function IsAppRunning: Boolean;
@@ -234,6 +298,9 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
+  { The app adds itself to Windows startup (the "Launch on startup" option); remove that entry too. }
+  if CurUninstallStep = usUninstall then
+    RegDeleteValue(HKCU, RunKey, 'LightDownloader');
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
     if MsgBox(CustomMessage('RemoveUserData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
       DelTree(ExpandConstant('{userappdata}\LightDownloader'), True, True, True);
