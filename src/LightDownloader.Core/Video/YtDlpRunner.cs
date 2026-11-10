@@ -27,7 +27,26 @@ public sealed class YtDlpRunner
             throw new InvalidOperationException("yt-dlp is still downloading in the background. Try again shortly.");
 
         Directory.CreateDirectory(item.SaveFolder);
+        Exception? first = null;
+        foreach (var cookies in CookieAttempts(item.Url, item.Cookies))
+        {
+            try
+            {
+                await RunOnceAsync(item, cookies, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                first ??= ex;
+                item.PercentOverride = null;
+            }
+        }
+        throw first!;
+    }
 
+    private async Task RunOnceAsync(DownloadItem item, string? cookies, CancellationToken ct)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = _tools.YtDlpPath,
@@ -44,7 +63,7 @@ public sealed class YtDlpRunner
             psi.ArgumentList.Add("--ffmpeg-location");
             psi.ArgumentList.Add(_tools.ToolsDir);
         }
-        AddRequestArgs(psi.ArgumentList, item.Referrer, item.Cookies, item.UserAgent);
+        AddRequestArgs(psi.ArgumentList, item.Referrer, cookies, item.UserAgent);
         psi.ArgumentList.Add("-o");
         psi.ArgumentList.Add(Path.Combine(item.SaveFolder, "%(title)s.%(ext)s"));
         psi.ArgumentList.Add(item.Url);
@@ -91,7 +110,11 @@ public sealed class YtDlpRunner
         }
 
         if (proc.ExitCode != 0)
-            throw new Exception(errorTail.Count > 0 ? string.Join(" | ", errorTail) : $"yt-dlp exited with code {proc.ExitCode}");
+        {
+            var error = errorTail.LastOrDefault(l => l.Contains("ERROR", StringComparison.Ordinal));
+            throw new Exception(error != null ? Friendly(error)
+                : errorTail.Count > 0 ? string.Join(" | ", errorTail) : $"yt-dlp exited with code {proc.ExitCode}");
+        }
 
         if (!string.IsNullOrEmpty(finalPath))
         {
@@ -128,6 +151,36 @@ public sealed class YtDlpRunner
         args.Add("--merge-output-format"); args.Add("mp4");
     }
 
+    /// <summary>
+    /// Which cookies to try, in order. Signed-in YouTube requests need a JavaScript runtime that yt-dlp
+    /// doesn't have here and then find no formats ("Requested format is not available"), so YouTube is
+    /// fetched signed out first and the browser's cookies are only the fallback (age-restricted or
+    /// members-only videos). Other sites get the cookies first, since they may need the login.
+    /// </summary>
+    private static string?[] CookieAttempts(string url, string? cookies)
+    {
+        if (string.IsNullOrEmpty(cookies)) return new string?[] { null };
+        return IsYouTube(url) ? new[] { null, cookies } : new[] { cookies, null };
+    }
+
+    private static bool IsYouTube(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var u)
+           && (u.Host == "youtu.be" || u.Host == "youtube.com"
+               || u.Host.EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase)
+               || u.Host.EndsWith("youtube-nocookie.com", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>A yt-dlp error line as a short sentence for the user.</summary>
+    private static string Friendly(string error)
+    {
+        bool Has(string s) => error.Contains(s, StringComparison.OrdinalIgnoreCase);
+        if (Has("Unsupported URL")) return "No downloadable video was found on this page.";
+        if (Has("Sign in to confirm your age")) return "This video is age-restricted. Sign in to the site in your browser, then try again.";
+        if (Has("Private video")) return "This video is private.";
+        if (Has("Requested format is not available")) return "No downloadable format was found for this video.";
+        // "ERROR: [youtube] abc123: message" -> "message"
+        return Regex.Replace(error.Replace("ERROR: ", ""), @"^\[[^\]]+\]\s*[^:\s]+:\s*", "").Trim();
+    }
+
     private static void AddRequestArgs(IList<string> args, string? referrer, string? cookies, string? userAgent)
     {
         if (!string.IsNullOrEmpty(referrer)) { args.Add("--referer"); args.Add(referrer); }
@@ -141,6 +194,18 @@ public sealed class YtDlpRunner
         if (!_tools.HasYtDlp)
             throw new InvalidOperationException("The video tools are still downloading. Try again in a minute.");
 
+        Exception? first = null;
+        foreach (var cookies in CookieAttempts(req.Url, req.Cookies))
+        {
+            try { return await ProbeOnceAsync(req, cookies, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { first ??= ex; }
+        }
+        throw first!;
+    }
+
+    private async Task<MediaInfo> ProbeOnceAsync(DownloadRequest req, string? cookies, CancellationToken ct)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = _tools.YtDlpPath,
@@ -152,7 +217,7 @@ public sealed class YtDlpRunner
         psi.ArgumentList.Add("-J");
         psi.ArgumentList.Add("--no-playlist");
         psi.ArgumentList.Add("--no-warnings");
-        AddRequestArgs(psi.ArgumentList, req.Referrer, req.Cookies, req.UserAgent);
+        AddRequestArgs(psi.ArgumentList, req.Referrer, cookies, req.UserAgent);
         psi.ArgumentList.Add(req.Url);
 
         using var proc = new Process { StartInfo = psi };
@@ -174,9 +239,7 @@ public sealed class YtDlpRunner
         {
             var err = (await stderr.ConfigureAwait(false)).Trim();
             var line = err.Split('\n').LastOrDefault(l => l.Contains("ERROR", StringComparison.Ordinal)) ?? err;
-            throw new Exception(line.Contains("Unsupported URL", StringComparison.OrdinalIgnoreCase)
-                ? "No downloadable video was found on this page."
-                : line.Replace("ERROR: ", "").Trim());
+            throw new Exception(Friendly(line));
         }
         return MediaInfo.Parse(json, _tools.HasFfmpeg);
     }

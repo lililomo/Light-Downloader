@@ -1,5 +1,2 @@
-• A classic Windows look, like IDM: menu bar, toolbar, categories and a sortable download list.
-• "Download this video" button over web video players, with a choice of quality.
-• Options: choose which browsers and which file types are captured.
-• Firefox: downloads are captured even when Firefox asks where to save files.
-• Light Downloader can start with Windows and checks for updates by itself.
+• Fixed: "Download this video" on YouTube said "Requested format is not available" when you were signed in to YouTube in your browser.
+• Clearer messages when a video can't be downloaded (private, age-restricted, no video on the page).
