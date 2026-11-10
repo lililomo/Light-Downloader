@@ -137,14 +137,19 @@
     menuOpen = true;
     clearTimeout(hideTimer);
     const video = current, url = pageUrl();
-    const direct = /^https?:/.test(video.currentSrc || '') ? video.currentSrc : '';
+    const src = /^https?:/.test(video.currentSrc || '') ? video.currentSrc : '';
+    // A streaming playlist (HLS .m3u8, DASH .mpd) only lists the pieces of the video; saved "as is"
+    // it would be a small text file, so the app fetches the stream itself (with yt-dlp) instead.
+    const stream = isStreamPlaylist(src) ? src : '';
+    const direct = stream ? '' : src;
     menu.replaceChildren(note('Getting available qualities…'));
     menu.style.display = 'block';
 
     const res = await getFormats(url, retry);
     if (!menuOpen || current !== video) return;
     menu.replaceChildren();
-    if (res && res.ok && res.options && res.options.length) {
+    const listed = !!(res && res.ok && res.options && res.options.length);
+    if (listed) {
       if (res.title) menu.append(make('div', { padding: '3px 12px 5px', color: '#555', borderBottom: '1px solid #e3e3e3', marginBottom: '2px', maxWidth: '330px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, res.title));
       for (const o of res.options)
         menu.append(row(o.label, o.detail, o.size, () => download({ type: 'video-download', url, format: o.id, title: res.title, pageUrl: location.href })));
@@ -155,6 +160,15 @@
     if (direct)
       menu.append(row('Video file', 'download the player\'s source as is', '', () =>
         download({ type: 'video-download', direct: true, url: direct, filename: '', pageUrl: location.href })));
+    else if (stream && !listed) // the page itself isn't supported, but the stream the player plays is
+      menu.append(row('Video stream', 'save what the player is playing', '', () =>
+        download({ type: 'video-download', url: stream, format: '', title: document.title, pageUrl: location.href })));
+  }
+
+  function isStreamPlaylist(src) {
+    if (!src) return false;
+    try { return /\.(m3u8|mpd|f4m)$|\.ism[lv]?\/manifest/i.test(new URL(src).pathname); }
+    catch (e) { return false; }
   }
 
   async function download(msg) {

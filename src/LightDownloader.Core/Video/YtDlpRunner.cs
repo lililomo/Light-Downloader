@@ -27,22 +27,19 @@ public sealed class YtDlpRunner
             throw new InvalidOperationException("yt-dlp is still downloading in the background. Try again shortly.");
 
         Directory.CreateDirectory(item.SaveFolder);
-        Exception? first = null;
-        foreach (var cookies in CookieAttempts(item.Url, item.Cookies))
+        await WithCookieAttemptsAsync(item.Url, item.Cookies, async cookies =>
         {
             try
             {
                 await RunOnceAsync(item, cookies, ct).ConfigureAwait(false);
-                return;
+                return true;
             }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                first ??= ex;
                 item.PercentOverride = null;
+                throw;
             }
-        }
-        throw first!;
+        }).ConfigureAwait(false);
     }
 
     private async Task RunOnceAsync(DownloadItem item, string? cookies, CancellationToken ct)
@@ -57,6 +54,7 @@ public sealed class YtDlpRunner
         };
         psi.ArgumentList.Add("--newline");
         psi.ArgumentList.Add("--no-playlist");
+        bool hasRuntime = AddJsRuntimeArgs(psi.ArgumentList);
         AddFormatArgs(psi.ArgumentList, item.VideoFormat);
         if (_tools.HasFfmpeg)
         {
@@ -65,7 +63,7 @@ public sealed class YtDlpRunner
         }
         AddRequestArgs(psi.ArgumentList, item.Referrer, cookies, item.UserAgent);
         psi.ArgumentList.Add("-o");
-        psi.ArgumentList.Add(Path.Combine(item.SaveFolder, "%(title)s.%(ext)s"));
+        psi.ArgumentList.Add(Path.Combine(item.SaveFolder, OutputName(item)));
         psi.ArgumentList.Add(item.Url);
 
         using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -112,8 +110,8 @@ public sealed class YtDlpRunner
         if (proc.ExitCode != 0)
         {
             var error = errorTail.LastOrDefault(l => l.Contains("ERROR", StringComparison.Ordinal));
-            throw new Exception(error != null ? Friendly(error)
-                : errorTail.Count > 0 ? string.Join(" | ", errorTail) : $"yt-dlp exited with code {proc.ExitCode}");
+            throw error != null ? Fail(error, item.Url, cookies, hasRuntime)
+                : new Exception(errorTail.Count > 0 ? string.Join(" | ", errorTail) : $"yt-dlp exited with code {proc.ExitCode}");
         }
 
         if (!string.IsNullOrEmpty(finalPath))
@@ -128,6 +126,25 @@ public sealed class YtDlpRunner
         }
         item.PercentOverride = 100;
     }
+
+    /// <summary>
+    /// yt-dlp's output name. A stream playlist (.m3u8 / .mpd, from the browser's "Video stream" choice) has no
+    /// title of its own, only a file name like "master" or "index", so the page title the browser sent
+    /// (the item's placeholder name) names the file.
+    /// </summary>
+    private static string OutputName(DownloadItem item)
+    {
+        if (IsStreamPlaylist(item.Url) && !item.FileName.StartsWith("(", StringComparison.Ordinal))
+        {
+            var name = Regex.Replace(item.FileName, @"\.(mp4|mkv|webm|m4a|mp3)$", "", RegexOptions.IgnoreCase).Trim();
+            if (name.Length > 0) return name.Replace("%", "%%") + ".%(ext)s";
+        }
+        return "%(title)s.%(ext)s";
+    }
+
+    private static bool IsStreamPlaylist(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var u)
+           && Regex.IsMatch(u.AbsolutePath, @"\.(m3u8|mpd|f4m)$|\.ism[lv]?/manifest", RegexOptions.IgnoreCase);
 
     /// <summary>yt-dlp format selection for a quality picked in the browser or the New-download dialog.</summary>
     private void AddFormatArgs(IList<string> args, string? format)
@@ -152,15 +169,71 @@ public sealed class YtDlpRunner
     }
 
     /// <summary>
-    /// Which cookies to try, in order. Signed-in YouTube requests need a JavaScript runtime that yt-dlp
-    /// doesn't have here and then find no formats ("Requested format is not available"), so YouTube is
-    /// fetched signed out first and the browser's cookies are only the fallback (age-restricted or
-    /// members-only videos). Other sites get the cookies first, since they may need the login.
+    /// Which cookies to try, in order. YouTube is fetched signed out first, which works for most videos
+    /// and keeps the user's account out of it; the browser's cookies are the fallback for videos that
+    /// need the login (members-only, age-restricted, "confirm you're not a bot"). Signed-in YouTube
+    /// requests need a JavaScript runtime (see <see cref="AddJsRuntimeArgs"/>). Other sites get the
+    /// cookies first, since they may need the login.
     /// </summary>
     private static string?[] CookieAttempts(string url, string? cookies)
     {
         if (string.IsNullOrEmpty(cookies)) return new string?[] { null };
         return IsYouTube(url) ? new[] { null, cookies } : new[] { cookies, null };
+    }
+
+    /// <summary>
+    /// Runs <paramref name="attempt"/> with each of <see cref="CookieAttempts"/> until one succeeds. When the
+    /// signed-out attempt was refused for needing a login and the signed-in one failed too, the signed-in
+    /// error is the one to show (it says why the user's own account didn't get the video).
+    /// </summary>
+    private static async Task<T> WithCookieAttemptsAsync<T>(string url, string? cookies, Func<string?, Task<T>> attempt)
+    {
+        Exception? first = null, signedOut = null, signedIn = null;
+        foreach (var c in CookieAttempts(url, cookies))
+        {
+            try { return await attempt(c).ConfigureAwait(false); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                first ??= ex;
+                if (c == null) signedOut = ex; else signedIn = ex;
+            }
+        }
+        throw signedOut is YtDlpError { NeedsLogin: true } && signedIn != null ? signedIn : first!;
+    }
+
+    /// <summary>
+    /// Gives yt-dlp a JavaScript runtime (our deno, or the user's Node.js) so YouTube works with the
+    /// browser's cookies. Returns false when there is none yet.
+    /// </summary>
+    private bool AddJsRuntimeArgs(IList<string> args)
+    {
+        if (_tools.FindJsRuntime() is not { } rt) return false;
+        args.Add("--js-runtimes");
+        args.Add($"{rt.Name}:{rt.Path}");
+        return true;
+    }
+
+    private sealed class YtDlpError(string message, bool needsLogin) : Exception(message)
+    {
+        public bool NeedsLogin { get; } = needsLogin;
+    }
+
+    /// <summary>The exception for a yt-dlp error line.</summary>
+    private static YtDlpError Fail(string error, string url, string? cookies, bool hasRuntime)
+    {
+        // Signed in to YouTube without a JavaScript runtime, yt-dlp sees no formats at all.
+        if (!hasRuntime && cookies != null && IsYouTube(url)
+            && error.Contains("Requested format is not available", StringComparison.OrdinalIgnoreCase))
+            return new YtDlpError("Light Downloader is still downloading a tool it needs for this video. Try again in a few minutes.", false);
+        return new YtDlpError(Friendly(error), NeedsLogin(error));
+    }
+
+    private static bool NeedsLogin(string error)
+    {
+        bool Has(string s) => error.Contains(s, StringComparison.OrdinalIgnoreCase);
+        return Has("members-only") || Has("Join this channel") || Has("Sign in") || Has("Private video")
+               || Has("login") || Has("log in") || Has("--cookies");
     }
 
     private static bool IsYouTube(string url)
@@ -174,6 +247,9 @@ public sealed class YtDlpRunner
     {
         bool Has(string s) => error.Contains(s, StringComparison.OrdinalIgnoreCase);
         if (Has("Unsupported URL")) return "No downloadable video was found on this page.";
+        if (Has("members-only") || Has("Join this channel"))
+            return "This video is for channel members only. Open it in your browser while signed in with a member account, then try again.";
+        if (Has("not a bot")) return "YouTube wants to confirm you're not a bot. Sign in to YouTube in your browser, then try again.";
         if (Has("Sign in to confirm your age")) return "This video is age-restricted. Sign in to the site in your browser, then try again.";
         if (Has("Private video")) return "This video is private.";
         if (Has("Requested format is not available")) return "No downloadable format was found for this video.";
@@ -194,14 +270,7 @@ public sealed class YtDlpRunner
         if (!_tools.HasYtDlp)
             throw new InvalidOperationException("The video tools are still downloading. Try again in a minute.");
 
-        Exception? first = null;
-        foreach (var cookies in CookieAttempts(req.Url, req.Cookies))
-        {
-            try { return await ProbeOnceAsync(req, cookies, ct).ConfigureAwait(false); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { first ??= ex; }
-        }
-        throw first!;
+        return await WithCookieAttemptsAsync(req.Url, req.Cookies, cookies => ProbeOnceAsync(req, cookies, ct)).ConfigureAwait(false);
     }
 
     private async Task<MediaInfo> ProbeOnceAsync(DownloadRequest req, string? cookies, CancellationToken ct)
@@ -217,6 +286,7 @@ public sealed class YtDlpRunner
         psi.ArgumentList.Add("-J");
         psi.ArgumentList.Add("--no-playlist");
         psi.ArgumentList.Add("--no-warnings");
+        bool hasRuntime = AddJsRuntimeArgs(psi.ArgumentList);
         AddRequestArgs(psi.ArgumentList, req.Referrer, cookies, req.UserAgent);
         psi.ArgumentList.Add(req.Url);
 
@@ -239,7 +309,7 @@ public sealed class YtDlpRunner
         {
             var err = (await stderr.ConfigureAwait(false)).Trim();
             var line = err.Split('\n').LastOrDefault(l => l.Contains("ERROR", StringComparison.Ordinal)) ?? err;
-            throw new Exception(Friendly(line));
+            throw Fail(line, req.Url, cookies, hasRuntime);
         }
         return MediaInfo.Parse(json, _tools.HasFfmpeg);
     }

@@ -55,7 +55,7 @@ public partial class App : Application
         try { Server.Start(Manager.Settings.ServerPort); } catch { /* bridge optional */ }
         ApplyRunAtStartup(Manager.Settings.RunAtStartup);
 
-        // Fetch yt-dlp + ffmpeg in the background (not bundled) so video/convert work later.
+        // Fetch yt-dlp, ffmpeg and deno in the background (not bundled) so video/convert work later.
         Manager.Tools.EnsureInBackground();
 
         foreach (var i in Manager.Items)

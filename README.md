@@ -24,7 +24,7 @@ Download: https://beliaja.id/light-downloader/
 - **Queue** — limits how many downloads run at once; the rest wait.
 - **Speed limiter** — global cap, plus an optional per-download cap in the progress window.
 - **Browser capture** — Chrome (MV3) + Firefox extensions take over downloads of the listed file types and hand the URL + cookies + referrer/User-Agent to the app. Chrome decides when the browser names the file (`downloads.onDeterminingFilename`); Firefox when the response arrives (`webRequest`), so Firefox's own Save dialog never appears first.
-- **Video grabber** — a "Download this video" button over web players (like IDM's panel) lists the qualities yt-dlp finds (e.g. 2160p … 144p, M4A, MP3); "Video" / right-click "Download video from this page" do the same from the app. Video and audio are merged with **ffmpeg**.
+- **Video grabber** — a "Download this video" button over web players (like IDM's panel) lists the qualities yt-dlp finds (e.g. 2160p … 144p, M4A, MP3); "Video" / right-click "Download video from this page" do the same from the app. Video and audio are merged with **ffmpeg**. When yt-dlp doesn't know the page, the menu still offers what the player itself plays: "Video file" for a plain file, or "Video stream" for an HLS/DASH playlist (`.m3u8` / `.mpd`, saved through yt-dlp under the page title).
 - **Media converter** — convert/remux a finished file (MP4 / MKV / MP3 / M4A / WAV) with ffmpeg.
 - **Simple scheduler** — optional daily "start all at HH:mm" / "pause all at HH:mm".
 - **System tray** — closing the window hides to tray; the app keeps running.
@@ -34,9 +34,12 @@ Download: https://beliaja.id/light-downloader/
   silently and starts the new version. *Help → Check for updates...* checks on demand; it can be
   turned off in Options → General.
 
-ffmpeg + yt-dlp are **not bundled**. On first run the app downloads them in the
+ffmpeg, yt-dlp and deno are **not bundled**. On first run the app downloads them in the
 background (into `%AppData%\LightDownloader\tools`) whenever the network is available,
-and retries while offline.
+and retries while offline. Deno is the JavaScript runtime yt-dlp needs for YouTube when the
+browser's sign-in is used (members-only, age-restricted videos); until it is there, an installed
+Node.js is used instead. YouTube is tried signed out first, and with the browser's cookies only
+when the video needs them.
 
 ## Requirements
 
@@ -48,7 +51,7 @@ and retries while offline.
 Double-click **`installer/LightDownloaderSetup.exe`**, a standard Windows setup wizard
 (English and Indonesian). It installs to `%LocalAppData%\Programs\Light Downloader` by default,
 adds Start Menu and optional Desktop shortcuts, registers an entry in *Add/Remove Programs*, and
-can launch the app when it finishes (the app then downloads ffmpeg + yt-dlp in the background).
+can launch the app when it finishes (the app then downloads ffmpeg, yt-dlp and deno in the background).
 On the last page it also offers to open the Chrome Web Store page in Chrome and the Firefox
 Add-ons page in Firefox, for each browser that is installed and doesn't have the extension yet.
 No administrator rights are needed for the app itself. If the .NET 8 Desktop Runtime is missing,

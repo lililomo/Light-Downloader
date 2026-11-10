@@ -76,7 +76,7 @@ public sealed class DownloadManager : IDisposable
 
     public HttpClient Http => _http;
 
-    /// <summary>Background-provisioned helper tools (yt-dlp + ffmpeg) for video/convert.</summary>
+    /// <summary>Background-provisioned helper tools (yt-dlp, ffmpeg, deno) for video/convert.</summary>
     public ToolProvisioner Tools { get; }
 
     public IReadOnlyList<DownloadItem> Items

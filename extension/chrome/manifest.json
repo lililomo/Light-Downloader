@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Light Downloader Integration",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Capture browser downloads and send them to the Light Downloader desktop app for faster, multi-connection downloading.",
   "author": "Light Downloader",
   "minimum_chrome_version": "102",

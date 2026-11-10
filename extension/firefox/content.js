@@ -62,7 +62,7 @@
   // ---- the button -----------------------------------------------------------
 
   const host = document.createElement('div');
-  css(host, { all: 'initial', position: 'fixed', zIndex: '2147483647', top: '0', left: '0', display: 'none' });
+  css(host, { all: 'initial', position: 'fixed', zIndex: '2147483647', top: '0', right: '0', display: 'none' });
   const root = host.attachShadow({ mode: 'closed' });
   const font = { fontFamily: '"Segoe UI", system-ui, sans-serif', fontSize: '12px', lineHeight: '16px', color: '#1b1b1b' };
 
@@ -74,7 +74,10 @@
   bar.append(main, close);
 
   const menu = make('div', Object.assign({ display: 'none', marginTop: '3px', minWidth: '260px', maxWidth: '360px', background: '#fff', border: '1px solid #a0a0a0', boxShadow: '2px 3px 8px rgba(0,0,0,.35)', padding: '3px 0' }, font));
-  root.append(bar, menu);
+  // Right-aligned column: the bar keeps its size and the menu opens under it, growing to the left.
+  const box = make('div', { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' });
+  box.append(bar, menu);
+  root.append(box);
 
   for (const [el, bg, over] of [[main, '#1d6fd6', '#2b7de4'], [close, '#155bb3', '#c42b1c']]) {
     el.addEventListener('mouseenter', () => { el.style.background = over; });
@@ -134,14 +137,19 @@
     menuOpen = true;
     clearTimeout(hideTimer);
     const video = current, url = pageUrl();
-    const direct = /^https?:/.test(video.currentSrc || '') ? video.currentSrc : '';
+    const src = /^https?:/.test(video.currentSrc || '') ? video.currentSrc : '';
+    // A streaming playlist (HLS .m3u8, DASH .mpd) only lists the pieces of the video; saved "as is"
+    // it would be a small text file, so the app fetches the stream itself (with yt-dlp) instead.
+    const stream = isStreamPlaylist(src) ? src : '';
+    const direct = stream ? '' : src;
     menu.replaceChildren(note('Getting available qualities…'));
     menu.style.display = 'block';
 
     const res = await getFormats(url, retry);
     if (!menuOpen || current !== video) return;
     menu.replaceChildren();
-    if (res && res.ok && res.options && res.options.length) {
+    const listed = !!(res && res.ok && res.options && res.options.length);
+    if (listed) {
       if (res.title) menu.append(make('div', { padding: '3px 12px 5px', color: '#555', borderBottom: '1px solid #e3e3e3', marginBottom: '2px', maxWidth: '330px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, res.title));
       for (const o of res.options)
         menu.append(row(o.label, o.detail, o.size, () => download({ type: 'video-download', url, format: o.id, title: res.title, pageUrl: location.href })));
@@ -152,6 +160,15 @@
     if (direct)
       menu.append(row('Video file', 'download the player\'s source as is', '', () =>
         download({ type: 'video-download', direct: true, url: direct, filename: '', pageUrl: location.href })));
+    else if (stream && !listed) // the page itself isn't supported, but the stream the player plays is
+      menu.append(row('Video stream', 'save what the player is playing', '', () =>
+        download({ type: 'video-download', url: stream, format: '', title: document.title, pageUrl: location.href })));
+  }
+
+  function isStreamPlaylist(src) {
+    if (!src) return false;
+    try { return /\.(m3u8|mpd|f4m)$|\.ism[lv]?\/manifest/i.test(new URL(src).pathname); }
+    catch (e) { return false; }
   }
 
   async function download(msg) {
@@ -205,8 +222,9 @@
     const r = current.getBoundingClientRect();
     if (r.bottom < 0 || r.top > innerHeight) { host.style.display = 'none'; return; }
     host.style.display = 'block';
-    const w = bar.offsetWidth || 170;
-    host.style.left = Math.max(4, Math.min(r.right, innerWidth) - w - 10) + 'px';
+    const viewW = document.documentElement.clientWidth || innerWidth; // excludes the scrollbar, like fixed positioning
+    const right = Math.min(r.right, viewW);
+    host.style.right = Math.max(4, Math.min(viewW - right + 10, viewW - (bar.offsetWidth || 170) - 4)) + 'px';
     host.style.top = Math.max(4, r.top + 10) + 'px';
   }
 
