@@ -50,6 +50,9 @@ public sealed class AppSettings
     /// <summary>Open the per-download progress window when a download is started.</summary>
     public bool ShowProgressWindow { get; set; } = true;
 
+    /// <summary>Show the "Download complete" window (Open / Open with / Open folder) when a download finishes.</summary>
+    public bool ShowCompleteDialog { get; set; } = true;
+
     /// <summary>Folders remembered per category, e.g. "Video" → "D:\Videos".</summary>
     public Dictionary<string, string> CategoryFolders { get; set; } = new();
 

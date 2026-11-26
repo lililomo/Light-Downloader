@@ -1,4 +1,2 @@
-• "Download this video" now works for YouTube members-only and age-restricted videos you can watch in your browser.
-• Light Downloader downloads one more helper tool in the background (deno, about 43 MB) for these videos.
-• "Video stream": on sites Light Downloader doesn't recognize, it can save the stream the player is playing (needs the browser extension 1.2.1).
-• Clearer message when a video is for channel members only.
+• "Download complete" window, like IDM: when a download finishes, its progress window closes and a window with Open, Open with..., Open folder and Close appears in its place.
+• Turn it off with "Don't show this dialog again", in Options > Downloads, or per download on the progress window's "Options on completion" tab.

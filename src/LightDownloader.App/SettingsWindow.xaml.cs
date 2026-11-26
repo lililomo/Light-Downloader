@@ -59,6 +59,7 @@ public partial class SettingsWindow : Window
 
         AskBox.IsChecked = s.AskWhereToSave;
         ProgressBox.IsChecked = s.ShowProgressWindow;
+        CompleteBox.IsChecked = s.ShowCompleteDialog;
     }
 
     private void OnCaptureToggled(object sender, RoutedEventArgs e)
@@ -135,6 +136,7 @@ public partial class SettingsWindow : Window
 
         _working.AskWhereToSave = AskBox.IsChecked == true;
         _working.ShowProgressWindow = ProgressBox.IsChecked == true;
+        _working.ShowCompleteDialog = CompleteBox.IsChecked == true;
         Result = _working;
         DialogResult = true;
     }

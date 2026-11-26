@@ -12,6 +12,9 @@ Download: https://beliaja.id/light-downloader/
   (sortable) and Explorer's file-type icons.
 - **Per-download progress window** — IDM's dialog: Download status / Speed Limiter / Options on
   completion tabs, segment map (one block per connection) and connection table.
+- **Download complete window** — like IDM, when a download finishes its progress window makes way for a
+  "Download complete" window (size, address, saved path; Open / Open with... / Open folder / Close). Turn it off
+  with "Don't show this dialog again", in Options → Downloads, or per download on "Options on completion".
 - **Ask where to save** — every new download (typed or captured from the browser) opens a
   "Download File Info" dialog with the size, category (auto-detected) and Save As path; the path can
   be remembered per category.

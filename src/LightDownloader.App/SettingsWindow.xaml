@@ -102,6 +102,7 @@
                 <StackPanel Margin="12">
                     <CheckBox x:Name="AskBox" Content="Show the start download dialog (choose where to save)" />
                     <CheckBox x:Name="ProgressBox" Content="Show the download progress dialog" Margin="0,8,0,0" />
+                    <CheckBox x:Name="CompleteBox" Content="Show the download complete dialog" Margin="0,8,0,0" />
                 </StackPanel>
             </TabItem>
         </TabControl>

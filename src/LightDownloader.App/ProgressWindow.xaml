@@ -61,7 +61,7 @@
             </TabItem>
             <TabItem Header="Options on completion">
                 <StackPanel Margin="12">
-                    <CheckBox x:Name="AutoCloseBox" Content="Close this window when the download finishes" />
+                    <CheckBox x:Name="CompleteBox" Content="Show the download complete dialog" />
                     <CheckBox x:Name="OpenFolderBox" Content="Open the folder when the download finishes" Margin="0,8,0,0" />
                 </StackPanel>
             </TabItem>

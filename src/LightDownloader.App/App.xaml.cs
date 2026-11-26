@@ -20,6 +20,7 @@ public partial class App : Application
     private WF.NotifyIcon _tray = null!;
     private MainWindow _main = null!;
     private readonly Dictionary<Guid, ProgressWindow> _progress = new();
+    private readonly Dictionary<Guid, CompleteWindow> _complete = new();
     private readonly HashSet<Guid> _announcedComplete = new();
     private UpdateWindow? _updateWindow;
     private System.Windows.Threading.DispatcherTimer? _updateTimer;
@@ -75,15 +76,12 @@ public partial class App : Application
         Manager.ItemChanged += item =>
         {
             if (item.Status != DownloadStatus.Completed) return;
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (_announcedComplete.Add(item.Id))
-                    _tray.ShowBalloonTip(3000, "Download complete", item.FileName, WF.ToolTipIcon.Info);
-            });
+            Dispatcher.InvokeAsync(() => OnDownloadFinished(item));
         };
         Manager.ItemRemoved += item => Dispatcher.InvokeAsync(() =>
         {
             if (_progress.TryGetValue(item.Id, out var w)) w.Close();
+            if (_complete.TryGetValue(item.Id, out var c)) c.Close();
         });
 
         // Windows starts us with --tray (see ApplyRunAtStartup): stay in the notification area.
@@ -195,6 +193,61 @@ public partial class App : Application
         w.Topmost = false;
     }
 
+    /// <summary>
+    /// A download just finished. Like IDM, its progress window makes way for the "Download complete" window
+    /// (unless that is turned off on the progress window's "Options on completion" tab). A download without a
+    /// progress window gets the complete window only when progress windows are off in Options (the complete
+    /// window is then the only sign it finished); otherwise the user closed it, and a tray balloon is enough.
+    /// </summary>
+    private void OnDownloadFinished(DownloadItem item)
+    {
+        if (!_announcedComplete.Add(item.Id)) return;
+
+        bool showComplete;
+        Rect? where = null;
+        if (_progress.TryGetValue(item.Id, out var progress))
+        {
+            if (progress.OpenFolderWhenDone) Shell.Reveal(item.FullPath, item.SaveFolder);
+            showComplete = progress.ShowCompleteDialog;
+            if (progress.WindowState == WindowState.Normal)
+                where = new Rect(progress.Left, progress.Top, progress.ActualWidth, progress.ActualHeight);
+            progress.Close();
+        }
+        else showComplete = Manager.Settings.ShowCompleteDialog && !Manager.Settings.ShowProgressWindow;
+
+        if (showComplete) ShowComplete(item, where);
+        else _tray.ShowBalloonTip(3000, "Download complete", item.FileName, WF.ToolTipIcon.Info);
+    }
+
+    /// <summary>Shows the "Download complete" window, where the progress window was if <paramref name="where"/> is given.</summary>
+    public void ShowComplete(DownloadItem item, Rect? where = null)
+    {
+        if (_complete.TryGetValue(item.Id, out var existing)) { existing.Activate(); return; }
+        var w = new CompleteWindow(item);
+        _complete[item.Id] = w;
+        w.Closed += (_, _) => _complete.Remove(item.Id);
+        if (where is { } r)
+        {
+            w.WindowStartupLocation = WindowStartupLocation.Manual;
+            w.Left = r.Left + (r.Width - w.Width) / 2;
+            w.Top = r.Top;
+        }
+        w.Show();
+        // It may pop up while the app sits in the tray: bring it to the front.
+        w.Topmost = true;
+        w.Activate();
+        w.Topmost = false;
+    }
+
+    /// <summary>"Don't show this dialog again" on the complete window.</summary>
+    public void TurnOffCompleteDialog()
+    {
+        if (!Manager.Settings.ShowCompleteDialog) return;
+        var s = Manager.Settings.Clone();
+        s.ShowCompleteDialog = false;
+        Manager.UpdateSettings(s);
+    }
+
     /// <summary>Shows (or focuses) the progress window of a download.</summary>
     public void ShowProgress(DownloadItem item)
     {
@@ -245,6 +298,7 @@ public partial class App : Application
         _updateTimer?.Stop();
         _main.AllowClose = true;
         foreach (var w in _progress.Values.ToList()) w.Close();
+        foreach (var w in _complete.Values.ToList()) w.Close();
         try { Server.Dispose(); } catch { }
         try { Manager.Dispose(); } catch { }
         Shutdown();

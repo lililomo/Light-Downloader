@@ -1,0 +1,33 @@
+<Window x:Class="LightDownloader.App.CompleteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Download complete" Width="480" Style="{StaticResource DialogWindow}"
+        ShowInTaskbar="True" WindowStartupLocation="CenterScreen" Icon="pack://application:,,,/Assets/app.ico">
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{x:Static SystemColors.ControlBrush}" BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,1,0,0" Padding="12,11">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="OpenButton" Content="Open" Style="{StaticResource DlgButton}" IsDefault="True" Click="OnOpen" />
+                <Button x:Name="OpenWithButton" Content="Open with..." Style="{StaticResource DlgButton}" Click="OnOpenWith" />
+                <Button Content="Open folder" Style="{StaticResource DlgButton}" Click="OnOpenFolder" />
+                <Button Content="Close" Style="{StaticResource DlgButton}" IsCancel="True" Click="OnClose" />
+            </StackPanel>
+        </Border>
+        <StackPanel Background="White">
+            <DockPanel Margin="16,16,16,0">
+                <Image x:Name="TypeIcon" Width="32" Height="32" Margin="0,0,14,0" VerticalAlignment="Top" />
+                <StackPanel>
+                    <TextBlock x:Name="Heading" Text="Download complete" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SizeText" Margin="0,4,0,0" />
+                </StackPanel>
+            </DockPanel>
+            <StackPanel Margin="16,14,16,14">
+                <TextBlock x:Name="AddressLabel" Text="Address" />
+                <TextBox x:Name="AddressBox" Margin="0,3,0,0" IsReadOnly="True" />
+                <TextBlock Text="The file saved as" Margin="0,10,0,0" />
+                <TextBox x:Name="PathBox" Margin="0,3,0,0" IsReadOnly="True" />
+                <CheckBox x:Name="DontShowBox" Content="Don't show this dialog again" Margin="0,14,0,0" />
+            </StackPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>

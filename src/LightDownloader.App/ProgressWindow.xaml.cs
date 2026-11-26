@@ -15,7 +15,6 @@ public partial class ProgressWindow : Window
     private readonly DownloadItem _item;
     private readonly DispatcherTimer _timer;
     private readonly ObservableCollection<ConnectionRow> _rows = new();
-    private bool _finishHandled;
     private bool _detailsHidden;
     private string? _iconFor;
 
@@ -29,8 +28,7 @@ public partial class ProgressWindow : Window
         UrlText.ToolTip = item.Url;
         LimitBox.IsChecked = item.SpeedLimitBytesPerSec > 0;
         if (item.SpeedLimitBytesPerSec > 0) LimitValue.Text = (item.SpeedLimitBytesPerSec / 1024).ToString();
-        // Already-finished downloads shouldn't immediately auto-close.
-        _finishHandled = item.Status == DownloadStatus.Completed;
+        CompleteBox.IsChecked = _mgr.Settings.ShowCompleteDialog;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _timer.Tick += (_, _) => Refresh();
@@ -40,6 +38,10 @@ public partial class ProgressWindow : Window
     }
 
     public Guid ItemId => _item.Id;
+
+    /// <summary>"Options on completion" tab: what to do when this download finishes (the app acts on it).</summary>
+    public bool ShowCompleteDialog => CompleteBox.IsChecked == true;
+    public bool OpenFolderWhenDone => OpenFolderBox.IsChecked == true;
 
     private void Refresh()
     {
@@ -94,14 +96,6 @@ public partial class ProgressWindow : Window
             : it.Status == DownloadStatus.Error ? "Retry" : "Resume";
         CancelButton.Content = done || !running ? "Close" : "Cancel";
         LimitBox.IsEnabled = LimitValue.IsEnabled = it.Kind == DownloadKind.Http && !done;
-
-        if (done && !_finishHandled)
-        {
-            _finishHandled = true;
-            if (OpenFolderBox.IsChecked == true) Shell.Reveal(it.FullPath, it.SaveFolder);
-            if (AutoCloseBox.IsChecked == true) Close();
-            else Activate();
-        }
     }
 
     private static string Describe(DownloadItem it) => it.Status switch

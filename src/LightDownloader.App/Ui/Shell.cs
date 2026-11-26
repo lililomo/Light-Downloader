@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace LightDownloader.App;
@@ -16,6 +17,28 @@ internal static class Shell
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
         catch { /* no associated app, or the file is gone */ }
     }
+
+    /// <summary>Windows' "How do you want to open this file?" picker; the chosen app opens the file.</summary>
+    public static void OpenWith(string path, IntPtr owner)
+    {
+        if (!File.Exists(path)) return;
+        var info = new OpenAsInfo { File = path, Flags = OaifAllowRegistration | OaifExec };
+        try { SHOpenWithDialog(owner, ref info); }
+        catch { /* old shell without the API */ }
+    }
+
+    private const int OaifAllowRegistration = 0x1, OaifExec = 0x4;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct OpenAsInfo
+    {
+        public string File;
+        public string? Class;
+        public int Flags;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHOpenWithDialog(IntPtr hwndParent, ref OpenAsInfo info);
 
     /// <summary>Opens a page in a specific browser ("chrome.exe", "firefox.exe"), or the default one if it isn't installed.</summary>
     public static void OpenIn(string browserExe, string url)
