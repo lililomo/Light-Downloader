@@ -11,7 +11,7 @@
     <AssemblyName>LightDownloader</AssemblyName>
     <RootNamespace>LightDownloader.App</RootNamespace>
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
-    <Version>1.2.3</Version>
+    <Version>1.2.4</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 

@@ -2,6 +2,7 @@
 
 #define AppName "Light Downloader"
 #define AppExe "LightDownloader.exe"
+#define AppGuid "FBFF579A-7A2C-485E-80D7-D339E539ED60"
 #define ChromeStoreUrl "https://chromewebstore.google.com/detail/light-downloader-integrat/oaghadmejhjmmkagkdimogebdncmmpci"
 #define FirefoxAddonUrl "https://addons.mozilla.org/en-US/firefox/addon/light-downloader-integration/"
 #define Root SourcePath + ".."
@@ -11,7 +12,7 @@
 
 [Setup]
 ; Keep AppId stable: it is how an update finds the existing install.
-AppId={{FBFF579A-7A2C-485E-80D7-D339E539ED60}
+AppId={{{#AppGuid}}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
@@ -52,6 +53,7 @@ english.AppStillRunning=Light Downloader is still running. Close it from its tra
 english.InstallChromeExt=Install the browser extension in Google Chrome
 english.InstallFirefoxExt=Install the browser add-on in Mozilla Firefox
 english.RemoveUserData=Also delete your Light Downloader settings, download list and its downloaded tools (ffmpeg, yt-dlp)?%n%nFiles you downloaded are not affected.
+english.UpdateNeedsAdmin=This update needs administrator permission, because Light Downloader is installed in a protected folder:%n%1%n%nNothing was changed. To update, right-click Light Downloader and choose "Run as administrator", then use Help > Check for updates. Later updates will ask Windows for permission by themselves.
 indonesian.RuntimeDownloadTitle=Mengunduh .NET 8 Desktop Runtime
 indonesian.RuntimeDownloadDesc=Light Downloader memerlukan komponen gratis dari Microsoft ini (sekitar 60 MB).
 indonesian.RuntimeReady=Mengunduh dan memasang juga .NET 8 Desktop Runtime dari Microsoft (sekitar 60 MB).
@@ -61,6 +63,7 @@ indonesian.AppStillRunning=Light Downloader masih berjalan. Tutup dari ikon di t
 indonesian.InstallChromeExt=Pasang ekstensi browser di Google Chrome
 indonesian.InstallFirefoxExt=Pasang add-on browser di Mozilla Firefox
 indonesian.RemoveUserData=Hapus juga pengaturan, daftar unduhan, dan alat yang diunduh Light Downloader (ffmpeg, yt-dlp)?%n%nBerkas hasil unduhan Anda tidak terpengaruh.
+indonesian.UpdateNeedsAdmin=Update ini memerlukan izin administrator, karena Light Downloader terpasang di folder yang dilindungi:%n%1%n%nTidak ada yang diubah. Untuk update, klik kanan Light Downloader lalu pilih "Run as administrator", kemudian buka Help > Check for updates. Update berikutnya akan meminta izin ke Windows dengan sendirinya.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -88,7 +91,10 @@ Type: dirifempty; Name: "{app}"
 
 [Run]
 ; In-app update (silent setup started by the app with /UPDATE=1): start the new version again.
-Filename: "{app}\{#AppExe}"; Flags: nowait; Check: IsAppUpdate
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: IsAppUpdate and not RunningElevated
+; An update the app ran as administrator (its folder is protected, e.g. Program Files): start the app
+; through Explorer, so it runs as the normal user again and not as administrator.
+Filename: "{win}\explorer.exe"; Parameters: """{app}\{#AppExe}"""; Flags: nowait; Check: IsAppUpdate and RunningElevated
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent; Check: RuntimeInstalled
 ; The stores only let the user add an extension themselves, so open each store page in its own browser.
 Filename: "{code:ChromeExe}"; Parameters: """{#ChromeStoreUrl}"""; Description: "{cm:InstallChromeExt}"; Flags: nowait postinstall skipifsilent; Check: ChromeNeedsExtension
@@ -99,6 +105,7 @@ const
   AppMutex = 'LightDownloader_SingleInstance_8F2A';
   ExitSignal = 'LightDownloader_Exit_8F2A';
   LegacyKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\LightDownloader';
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#AppGuid}}_is1';
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   AppPathsKey = 'Software\Microsoft\Windows\CurrentVersion\App Paths\';
   ChromeExtensionId = 'oaghadmejhjmmkagkdimogebdncmmpci';
@@ -121,6 +128,55 @@ function CloseHandle(hObject: THandle): BOOL;
 function IsAppUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
+function RunningElevated: Boolean;
+begin
+  Result := IsAdmin;
+end;
+
+{ Folder of the copy being updated: /DIR from the app, else where this user installed it before. }
+function InstalledDir: String;
+begin
+  Result := ExpandConstant('{param:DIR}');
+  if Result = '' then
+    if not RegQueryStringValue(HKCU, UninstallKey, 'Inno Setup: App Path', Result) then
+      Result := '';
+  Result := RemoveQuotes(Result);
+  if Result <> '' then
+    Result := RemoveBackslashUnlessRoot(Result);
+end;
+
+function CanWriteTo(Dir: String): Boolean;
+var
+  Probe: String;
+begin
+  Probe := AddBackslash(Dir) + '.ld-write-test.tmp';
+  Result := SaveStringToFile(Probe, 'x', False);
+  if Result then
+    DeleteFile(Probe);
+end;
+
+{ An in-app update of a copy in a folder this user can't write to (e.g. Program Files, installed with
+  "Run as administrator") needs administrator rights. Light Downloader 1.2.4 and later start setup that
+  way themselves (Windows asks). Older versions start it as the normal user: every file would fail and
+  setup would roll back. Setup can't elevate itself here (its own EXE is locked while it runs), so
+  say what to do instead and start the old version again; nothing is changed. }
+function InitializeSetup: Boolean;
+var
+  Dir: String;
+  Code: Integer;
+begin
+  Result := True;
+  if not IsAppUpdate or IsAdmin then
+    Exit;
+  Dir := InstalledDir;
+  if (Dir = '') or not DirExists(Dir) or CanWriteTo(Dir) then
+    Exit;
+  Log('Updating ' + Dir + ' needs administrator rights, and setup was not started as administrator.');
+  MsgBox(FmtMessage(CustomMessage('UpdateNeedsAdmin'), [Dir]), mbInformation, MB_OK);
+  Exec(AddBackslash(Dir) + '{#AppExe}', '', Dir, SW_SHOWNORMAL, ewNoWait, Code);
+  Result := False;
 end;
 
 function HasLegacyInstall: Boolean;

@@ -35,7 +35,10 @@ Download: https://beliaja.id/light-downloader/
   software.beliaja.id. When a newer version is out it shows an update prompt (Update now / Remind me
   later / Skip this version); *Update now* downloads the installer, checks its SHA-256, runs it
   silently and starts the new version. *Help → Check for updates...* checks on demand; it can be
-  turned off in Options → General.
+  turned off in Options → General. A copy in a protected folder (e.g. Program Files, installed with
+  "Run as administrator") runs setup as administrator, so Windows asks for permission first; the app
+  then starts again as the normal user (through Explorer). Versions up to 1.2.3 can't ask: their
+  update shows how to update instead of rolling back.
 
 ffmpeg, yt-dlp and deno are **not bundled**. On first run the app downloads them in the
 background (into `%AppData%\LightDownloader\tools`) whenever the network is available,

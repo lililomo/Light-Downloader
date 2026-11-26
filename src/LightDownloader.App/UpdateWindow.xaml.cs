@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using LightDownloader.Core.Update;
@@ -20,6 +21,7 @@ public partial class UpdateWindow : Window
         NewText.Text = info.Version;
         SizeText.Text = info.Size > 0 ? Formatting.Bytes(info.Size) : "—";
         NotesBox.Text = string.IsNullOrWhiteSpace(info.Notes) ? "Improvements and fixes." : info.Notes.Trim();
+        AdminNote.Visibility = AppUpdater.CanWriteTo(AppUpdater.InstallDir) ? Visibility.Collapsed : Visibility.Visible;
         ActiveNote.Visibility = App.Current.Manager.Items.Any(i => i.IsActive)
             ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -44,29 +46,46 @@ public partial class UpdateWindow : Window
             });
             var setup = await App.Current.Updater.DownloadAsync(_info, progress, _cts.Token);
 
-            StatusText.Text = "Installing the update…";
-            // /UPDATE=1 makes setup start the app again when it's done.
-            Process.Start(new ProcessStartInfo(setup, "/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE=1") { UseShellExecute = true });
+            // /UPDATE=1 makes setup start the app again when it's done. A protected folder (Program Files)
+            // needs administrator rights: run setup "as administrator", which makes Windows ask first.
+            var dir = AppUpdater.InstallDir;
+            var psi = new ProcessStartInfo(setup, AppUpdater.SetupArguments(dir)) { UseShellExecute = true };
+            if (!AppUpdater.CanWriteTo(dir)) psi.Verb = "runas";
+            StatusText.Text = psi.Verb == "runas" ? "Waiting for administrator permission…" : "Installing the update…";
+            _cts.Dispose();
+            _cts = null; // past the point where Cancel can stop anything
+            LaterButton.IsEnabled = false;
+            await Task.Run(() => Process.Start(psi)); // the Windows prompt blocks until answered
             App.Current.ExitApp();
         }
         catch (OperationCanceledException)
         {
             if (!_closing) Close();
         }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED: "No" in the Windows prompt
+        {
+            ShowFailure("The update needs administrator permission, because Light Downloader is installed in "
+                        + AppUpdater.InstallDir + ". Click Try again and choose Yes when Windows asks. Nothing was changed.");
+        }
         catch (Exception ex)
         {
-            Progress.Visibility = Visibility.Collapsed;
-            StatusText.Foreground = (System.Windows.Media.Brush)FindResource("ErrorTextBrush");
-            StatusText.Text = "The update couldn't be installed: " + ex.Message;
-            UpdateButton.Content = "Try again";
-            UpdateButton.IsEnabled = SkipButton.IsEnabled = true;
-            LaterButton.Content = "Close";
+            ShowFailure("The update couldn't be installed: " + ex.Message);
         }
         finally
         {
             _cts?.Dispose();
             _cts = null;
         }
+    }
+
+    private void ShowFailure(string text)
+    {
+        Progress.Visibility = Visibility.Collapsed;
+        StatusText.Foreground = (System.Windows.Media.Brush)FindResource("ErrorTextBrush");
+        StatusText.Text = text;
+        UpdateButton.Content = "Try again";
+        UpdateButton.IsEnabled = SkipButton.IsEnabled = LaterButton.IsEnabled = true;
+        LaterButton.Content = "Close";
     }
 
     private void OnLater(object sender, RoutedEventArgs e)

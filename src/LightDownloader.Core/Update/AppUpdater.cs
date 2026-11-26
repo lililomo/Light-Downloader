@@ -96,6 +96,28 @@ public sealed class AppUpdater
         catch { /* ignore */ }
     }
 
+    /// <summary>The folder the running app is installed in (what setup updates).</summary>
+    public static string InstallDir => AppContext.BaseDirectory.TrimEnd('\\', '/');
+
+    /// <summary>
+    /// Setup's command line for an in-app update. /DIR keeps it on this folder; when the folder needs
+    /// administrator rights (Program Files), setup restarts itself elevated and Windows asks first.
+    /// </summary>
+    public static string SetupArguments(string installDir)
+        => $"/SILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE=1 /DIR=\"{installDir}\"";
+
+    /// <summary>False for a folder the user can't write to (e.g. Program Files without "Run as administrator").</summary>
+    public static bool CanWriteTo(string dir)
+    {
+        try
+        {
+            var probe = Path.Combine(dir, $".ld-write-test-{Guid.NewGuid():N}.tmp");
+            using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) { }
+            return true;
+        }
+        catch { return false; }
+    }
+
     public static Version? ParseVersion(string? text)
         => System.Version.TryParse(text?.Trim(), out var v) ? Normalize(v) : null;
 
